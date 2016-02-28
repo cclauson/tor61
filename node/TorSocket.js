@@ -6,10 +6,6 @@ var readOps = require('./helpers/CellReadOperations');
 // We lose some of the functionality of the socket object, but we're
 // unlikely to need anything that isn't already handled here, and the
 // abstraction is worth it.
-
-// Note that we deliberately don't pass through the 'data' listener
-// This is because the only data listener to the socket should be the
-// one internal to this class.
 function TorSocket(socket, id) {
 
 	// The listener to be called when new messages are available
@@ -140,21 +136,3 @@ function TorSocket(socket, id) {
 module.exports = {
 	TorSocket : TorSocket
 };
-
-// function logCell(cell) {
-// 	console.log("\n" + cell.length + "\n");
-// 	//console.log("\n" + cell.toString() + "\n");
-// }
-
-// var serverInfo = {
-// 	host: 'localhost',
-// 	port: 4444
-// };
-
-// var sock;
-
-// var testSocket = net.createConnection(serverInfo, function() {
-// 	sock = new TorSocket(testSocket, 1);
-// 	sock.on('data', logCell);
-// });
-

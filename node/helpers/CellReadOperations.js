@@ -35,6 +35,28 @@ function getBody(cell) {
 	return getData(cell, 14, 14 + length);
 }
 
+function getBodyString(cell) {
+	var length = getBodyLength(cell);
+	return getDataAsString(cell, 14, 14 + length);
+}
+
+function getBeginHost(cell) {
+	return getBodyString(cell);
+}
+
+function getExtendHost(cell) {
+	var bodyString = getBodyString(cell);
+	return bodyString.slice(0, bodyString.length - 4);
+}
+
+function getExtendAgent(cell) {
+	return getData(cell, cell.length - 4, cell.length);
+}
+
+function getDataAsString(cell, startByte, endByte) {
+	return ((cell.slice(startByte, endByte)).toString());
+}
+
 function getData(cell, startByte, endByte) {
 	var data = 0;
 	for(var i = startByte; i < endByte; i++) {

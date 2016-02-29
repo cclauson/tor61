@@ -41,16 +41,26 @@ function getBodyString(cell) {
 }
 
 function getBeginHost(cell) {
-	return getBodyString(cell);
+	var hostString = getBodyString(cell);
+	var hostSplit = hostString.split(":");
+	return {
+		host : hostSplit[0],
+		port : parseInt(hostSplit[1])
+	};
 }
 
 function getExtendHost(cell) {
-	var bodyString = getBodyString(cell);
-	return bodyString.slice(0, bodyString.length - 4);
+	var hostString = getBodyString(cell);
+	var hostSplit = hostString.slice(0, hostString.length - 4).split(":");
+	return {
+		host : hostSplit[0],
+		port : parseInt(hostSplit[1])
+	};
 }
 
 function getExtendAgent(cell) {
-	return getData(cell, cell.length - 4, cell.length);
+	var end = getBodyLength(cell) + 14;
+	return getData(cell, end - 4, end);
 }
 
 function getDataAsString(cell, startByte, endByte) {
@@ -75,5 +85,9 @@ module.exports = {
 	getPadding : getPadding,
 	getBodyLength : getBodyLength,
 	getRelayCommand : getRelayCommand,
-	getBody : getBody
+	getBody : getBody,
+	getBodyString : getBodyString,
+	getBeginHost : getBeginHost,
+	getExtendHost : getExtendHost,
+	getExtendAgent : getExtendAgent
 };

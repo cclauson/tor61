@@ -2,7 +2,9 @@ var readOps = require('./helpers/CellReadOperations');
 var makeOps = require('./helpers/CellMakeOperations');
 var checkOps = require('./helpers/CellCheckOperations');
 
-//var TorRelayer = require('./TorRelayer').TorRelayer;
+var removeConnection = require('./TorConnectionManager').removeConnection;
+
+var TorRelayer = require('./TorRelayer').TorRelayer;
 var TorEstablisher = require('./TorEstablisher').TorEstablisher;
 
 function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
@@ -53,6 +55,11 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		if(status === 'success') {
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
+			torSocket.on('close', function() {
+				removeConnection(otherAgent);
+				relayer.cleanup();
+				establisher.cleanup();
+			});
 			openHandshakeCallback('success', establisher, otherAgent);
 			torSocket.on('data', normalMessageHandler);
 		} else {
@@ -88,12 +95,12 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
 }
 
-var TorRelayer = function(socket) {
-	this.handleMessage = function(message) {
-		console.log("MESSAGE RELAYED:");
-		console.log(message);
-	}
-};
+// var TorRelayer = function(socket) {
+// 	this.handleMessage = function(message) {
+// 		console.log("MESSAGE RELAYED:");
+// 		console.log(message);
+// 	}
+// };
 
 // var TorEstablisher = function(socket, isOpener) {
 // 	this.isMyCircuit = function(circuitID) {

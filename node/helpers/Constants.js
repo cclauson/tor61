@@ -20,7 +20,8 @@ var relayTypes = {
 	extend_failed : 0x0c
 };
 
-global.MY_AGENT = 0x11223344;
+global.MY_GROUP = 0x0455;
+global.MY_AGENT = 0x04550000;
 
 // The chances we'll ever have a high enough ID for this
 // to be a problem are astronomically low, but hey, may as

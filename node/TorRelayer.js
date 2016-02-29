@@ -5,7 +5,7 @@ var constants = require('./helpers/Constants');
 var readOps = require('./helpers/CellReadOperations');
 var makeOps = require('./helpers/CellMakeOperations');
 var checkOps = require('./helpers/CellCheckOperations');
-var factory = require('./TorSocketFactory');
+var getConnection;
 
 var types = constants.types;
 var relayTypes = constants.relayTypes;
@@ -14,7 +14,7 @@ var relayTypes = constants.relayTypes;
 // router through this socket.
 function TorRelayer(torSocket) {
 	// Which Tor/Http socket to send information we receive on this socket to
-	// circuitNum -> socketID
+	// circuitNum -> torEstablisher
 	var incomingRoutingTable = {};
 
 	this.handleMessage = function(message) {
@@ -30,15 +30,25 @@ function TorRelayer(torSocket) {
 		}
 	};
 
+	this.cleanup = function() {
+		for(var key in incomingRoutingTable) {
+			var func = incomingRoutingTable[key];
+			if(typeof(func) === 'function') {
+				var destroy = makeOps.contructDestroy(key);
+				func(destroy);
+			}
+		}
+	};
+
 	function handleDestroy(message) {
 		var circuitID = readOps.getCircuit(message);
-		var destination = incomingRoutingTable[circuitID];
+		var establisher = incomingRoutingTable[circuitID];
 		// If we have a circuit for this ID
-		if(destination) {
+		if(establisher) {
 			// Delete it from our records
 			delete incomingRoutingTable[circuitID];
 			// Pass it along
-			destination(message, torSocket.getID());
+			establisher.sendMessage(torSocket.getID(), message);
 		}
 	}
 
@@ -56,15 +66,11 @@ function TorRelayer(torSocket) {
 	function handleRelay(message) {
 		var circuitNum = readOps.getCircuit(message);
 		// If this circuit is already extended 
-		if(typeof(incomingRoutingTable[circuitNum]) === 'function') {
+		if(typeof(incomingRoutingTable[circuitNum]) === 'Object') {
 			// have a generic relay response handler, or one that switches based on message
-			incomingRoutingTable[circuitNum](message, torSocket.getID(), function(status, message) {
-				if(status === 'success') {
-					makeOps.modifyCircuitID(message, circuitNum);
-					torSocket.write(message);
-				}
-			});
+			incomingRoutingTable[circuitNum].sendMessage(torSocket.getID(), message);
 		} else {
+			// We are the endpoint and need to handle the relay
 			var relayType = readOps.getRelayCommand(message);
 			if(relayType === relayTypes.begin) {
 				handleRelayBegin(message);
@@ -74,10 +80,6 @@ function TorRelayer(torSocket) {
 				handleRelayExtend(message);
 			}
 		}
-
-		if(readOps.getRelayCommand(message) === relayTypes.end) {
-			delete incomingRoutingTable[circuitID];
-		}
 	}
 
 	// These handlers only get called if we are the relay endpoint
@@ -85,19 +87,24 @@ function TorRelayer(torSocket) {
 		var circuitNum = readOps.getCircuit(message);
 		var destination = incomingRoutingTable[circuitNum];
 		if(destination === 'primed') {
+			if(!getConnection) {
+				getConnection = require('./TorConnectionManager').getConnection;
+			}
 			// construct a create from the body, send to correct port based on agent
-			factory.getConnection(getExtendAgent(message), function(status, senderFunction) {
+			getConnection(readOps.getExtendAgent(message), readOps.getExtendHost(message), function(status, establisher) {
 				if(status === 'success') {
-					// use senderFunction to send a create packet with a handler that
+					// use establisher to send a create packet with a handler that
 					// listens for a create success and relays it as a relay extended
 					// and also adds us to incomingRoutingTable
-					var create = makeOps.constructCreate(circuitNum);
-					senderFunction(create, torSocket.getID(), function(status, response) {
-
+					establisher.registerHandler(circuitNum, torSocket.getID(), function(status, response) {
+						responseHandler(status, response, circuitNum);
 					});
+
+					var create = makeOps.constructCreate(circuitNum);
+					establisher.sendMessage(torSocket.getID(), create);
 				} else {
 					var streamID = readOps.getStreamID(message);
-					var extendFailed = makeOps.contructRelayExtendFailed(circuitNum, streamID);
+					var extendFailed = makeOps.constructRelayExtendFailed(circuitNum, streamID);
 					torSocket.write(extendFailed);
 				}
 			});
@@ -117,6 +124,33 @@ function TorRelayer(torSocket) {
 	function handleRelayEnd(message) {
 		// pass along the end command
 		console.log("RELAY ENDING");
+	}
+
+	function responseHandler(status, message, circuitID) {
+		if(status === 'success') {
+			var type = readOps.getType(message);
+			var toSend;
+			if(type === types.created) {
+				// send extended
+				toSend = makeOps.constructRelayExtended(circuitID, 0);
+			} else if(type === types.create_failed) {
+				// send extend failed
+				toSend = makeOps.constructRelayExtendFailed(circuitID, 0);
+			} else {
+				// send through
+				toSend = message;
+				makeOps.modifyCircuitID(toSend, circuitID);
+			}
+			torSocket.write(toSend, function() {
+				if(type === types.destroy) {
+					delete incomingRoutingTable[circuitID];
+				}
+			});
+		} else if(status === 'ended') {
+			var destroy = makeOps.constructDestroy(circuitID);
+			torSocket.write(destroy);
+			delete incomingRoutingTable[circuitID];
+		}
 	}
 
 }

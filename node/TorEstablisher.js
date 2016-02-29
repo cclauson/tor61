@@ -17,6 +17,12 @@ function TorEstablisher(torSocket, isOpener) {
 	// POTENTIALLY REPLACE WITH socketID -> (function, isWaiting)
 	var incomingRoutingTable = {};
 
+	this.cleanup = function() {
+		for(var key in incomingRoutingTable) {
+			incomingRoutingTable('ended');
+		}
+	}
+
 	this.isMyCircuit = function(circuitNum) {
 		return((incomingRoutingTable[circuitNum]) ? true : false);
 	};

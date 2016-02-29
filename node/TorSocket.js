@@ -2,6 +2,8 @@ var net = require('net');
 var types = require('./helpers/Constants').types;
 var readOps = require('./helpers/CellReadOperations');
 
+var packetString = require('./helpers/PacketPrinter').packetString;
+
 // Abstracts the process of splitting TCP stream data into Tor cells
 // We lose some of the functionality of the socket object, but we're
 // unlikely to need anything that isn't already handled here, and the
@@ -44,7 +46,7 @@ function TorSocket(socket, id) {
 
 	// Passes write calls to the socket
 	this.write = function(data, callback) {
-		//socket.write.apply(this, arguments);
+		console.log("\nWriting on Socket " + id + ":\n" + packetString(data));
 		socket.write(data, callback);
 	};
 
@@ -119,7 +121,9 @@ function TorSocket(socket, id) {
 			if(!dataListener) {
 				break;
 			}
-			dataListener(outputBuffer.shift());
+			var nextPacket = outputBuffer.shift();
+			console.log("\nReceived on Socket " + id + ":\n" + packetString(nextPacket));
+			dataListener(nextPacket);
 		}
 	}
 

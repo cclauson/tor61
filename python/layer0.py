@@ -1,4 +1,6 @@
-import socket, select, threading, sys, os, heapq
+import select, threading, thread, sys, os, heapq, time
+import socket as sox
+import layer0client
 
 #for now, hard code http and tor
 #port numbers
@@ -16,7 +18,7 @@ socketWriteTimoutSecs = 10.0
 #create a non-blocking server socket at the
 #given port
 def constructServerSocket(portnum):
-  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  sock = sox.socket(sox.AF_INET, sox.SOCK_STREAM)
   sock.bind((bindhost, portnum))
   sock.setblocking(0)
   sock.listen(10)
@@ -34,20 +36,20 @@ def doSocketDisposal(socket):
   #done) and results in an exception
   #then actually just ignore it
   try:
-    readsocket.shutdown(socket.SHUT_RDWR)
-  except socket.error as e:
+    socket.shutdown(sox.SHUT_RDWR)
+  except sox.error as e:
     pass
   try:
-    readsocket.shutdown(socket.SHUT_WR)
-  except socket.error as e:
+    socket.shutdown(sox.SHUT_WR)
+  except sox.error as e:
     pass
   try:
-    readsocket.shutdown(socket.SHUT_RD)
-  except socket.error as e:
+    socket.shutdown(sox.SHUT_RD)
+  except sox.error as e:
     pass
   try:
-    readsocket.close()
-  except socket.error as e:
+    socket.close()
+  except sox.error as e:
     pass
 
 
@@ -75,6 +77,20 @@ socketMapLock = threading.Lock()
 #let's do this anyways, it doesn't hurt, anyways it's basically
 #what you would want to do in C or Java
 
+#instatiate all logic supported by layer 0
+l0client = layer0client.Layer0Client()
+
+
+#We will need threads in this layer for creation of TCP
+#connections, so we create a lock, any time an output
+#event function is called, the lock should be acquired,
+#then released after we return
+outputSynchronizationLock = threading.Lock()
+#VERY IMPORTANT NOTE: It would be a programming error
+#for a thread which arrived on an input event function
+#to try to acquire this lock, the lock will already
+#have been acquired and this would lead to deadlock
+
 
 #############################################################
 #
@@ -82,29 +98,37 @@ socketMapLock = threading.Lock()
 #
 #############################################################
 
+#we just route all of these events to methods on l0client
+#NOTE: Don't call any of these methods while we have locks
+#acquired
+
 def init():
-  #TODO: Handler here...
-  pass
+  l0client.init()
 
 def newHttpTcpConnection(socket):
-  #TODO: Handler here...
-  pass
+  if socketMapLock.locked():
+    raise RuntimeError("SocketMapLock acquired, but shouldn't be")
+  l0client.newHttpTcpConnection(socket)
 
 def newTorTcpConnection(socket):
-  #TODO: Handler here...
-  pass
+  if socketMapLock.locked():
+    raise RuntimeError("SocketMapLock acquired, but shouldn't be")
+  l0client.newTorTcpConnection(socket)
 
-def tcpConnectionLost(socket)
-  #TODO: Handler here...
-  pass
+def tcpConnectionLost(socket):
+  if socketMapLock.locked():
+    raise RuntimeError("SocketMapLock acquired, but shouldn't be")
+  l0client.tcpConnectionLost(socket)
 
-def dataArrivedOnTcpConnection(socket, data)
-  #TODO: Handler here...
-  pass
+def dataArrivedOnTcpConnection(socket, data):
+  if socketMapLock.locked():
+    raise RuntimeError("SocketMapLock acquired, but shouldn't be")
+  l0client.dataArrivedOnTcpConnection(socket, data)
 
 def timeoutExpired(channel, obj):
-  #TODO: Handler here...
-  pass
+  if socketMapLock.locked():
+    raise RuntimeError("SocketMapLock acquired, but shouldn't be")
+  l0client.timeoutExpired(channel, obj)
 
 ################## END OUTPUT EVENTS #######################
 
@@ -157,33 +181,23 @@ class CancellableTimeout:
     self.isCancelled = False
 
 
-#We will need threads in this layer for creation of TCP
-#connections, so we create a lock, any time an output
-#event function is called, the lock should be acquired,
-#then released after we return
-outputSynchronizationLock = threading.Lock()
-#VERY IMPORTANT NOTE: It would be a programming error
-#for a thread which arrived on an input event function
-#to try to acquire this lock, the lock will already
-#have been acquired and this would lead to deadlock
-
 #function for creating a TCP connection, this will be
 #called on a new thread each time we want to create
 #a connection
-def doTcpCreate((host, portnum, callback)):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def doTcpCreate(host, portnum, callback):
+    sock = sox.socket(sox.AF_INET, sox.SOCK_STREAM)
     try:
       sock.connect((host, portnum))
       #success
-      timout = None
+      timeout = None
       socketMapLock.acquire()
-      nonServerSockets[sock] = ('', timout)
+      nonServerSockets[sock] = ('', timeout)
       socketMapLock.release()
       #do callback
       outputSynchronizationLock.acquire()
       callback(sock)
       outputSynchronizationLock.release()
-    except socket.err as e:
+    except sox.error as e:
       #failure
       doSocketDisposal(sock)
       outputSynchronizationLock.acquire()
@@ -198,21 +212,23 @@ def doTcpCreate((host, portnum, callback)):
 #############################################################
 
 def closeTcpConnection(socket):
+  #print "Got close tcp connection"
   socketMapLock.acquire()
   if socket in nonServerSockets.keys():
     #Let's cancel the timeout, it shouldn't break
     #if we don't but it's slightly more efficient
     buf, timeout = nonServerSockets[socket]
-    if timeout != None
+    if timeout != None:
       timeout.isCancelled = True
-    del nonServerSockets[readsocket]
+    del nonServerSockets[socket]
     socketMapLock.release()
-    doSocketDisposal(readsocket)
+    doSocketDisposal(socket)
   else:
     socketMapLock.release()
     raise ValueError('request came to close socket, but this socket is not open')
 
 def sendDataOnTcpConnection(socket, data):
+  #print "Got send data event"
   socketMapLock.acquire()
   if socket in nonServerSockets.keys():
     #we just buffer it to send later
@@ -220,7 +236,7 @@ def sendDataOnTcpConnection(socket, data):
     buf = buf + data
     #also, if no timeout exists and the buffer isn't empty, we need to schedule one
     if buf != '' and timeout == None:
-      timout = CancellableTimeout()
+      timeout = CancellableTimeout()
       #also put a reference to the socket in the timeout
       timeout.socket = socket
       doTimeoutSchedule(socketWriteTimoutSecs, -1, timeout)
@@ -232,16 +248,18 @@ def sendDataOnTcpConnection(socket, data):
 
 #NOTE: Callback takes one parameter, the socket.  It will
 #be Python "None" on failure
-def createTcpConnection(host, portnum, callback)
+def createTcpConnection(host, portnum, callback):
+  #print "Got create tcp connection event"
   #we create new thread, since blocking our thread on tcp port
   #creation is inefficient, and could actually lead to deadlock
   #in a situation where we are connecting to ourselves.
   #However, we use synchronization locks to limit access to certain
   #resources to one thread at a time, these two resources being
   #the non server socket map and the upper layer event delivery interface
-  threading.start_new_thread(doTcpCreate, (host, portnum, callback))
+  thread.start_new_thread(doTcpCreate, (host, portnum, callback))
 
 def scheduleTimeout(delay, channel, obj):
+  #print "Got schedule timeout event"
   if channel < 0:
     raise ValueError('got channel {}, but these channels are reserved')
   else:
@@ -249,19 +267,25 @@ def scheduleTimeout(delay, channel, obj):
 
 ################### END INPUT EVENTS ########################
 
+#register all input event functions as callbacks of l0client
+l0client.closeTcpCallback = closeTcpConnection
+l0client.sendTcpDataCallback = sendDataOnTcpConnection
+l0client.createTcpConCallback = createTcpConnection
+l0client.scheduleTimeoutHandler = scheduleTimeout
+
 
 #call init before entering in to event loop
 init()
 
 while True:
 
-  inputs = [httpServerSocket, torServerSocket]
-  outputs = []
-  errs = []
+  potential_readers = [httpServerSocket, torServerSocket]
+  potential_writers = []
+  potential_errs = []
 
   socketMapLock.acquire()
-  inputs.extend(nonServerSockets.keys())
-  outputs.extend(nonServerSockets.keys())
+  potential_readers.extend(nonServerSockets.keys())
+  potential_writers.extend(nonServerSockets.keys())
   socketMapLock.release()
 
   #at this point, we remove all cancelled timeouts
@@ -269,7 +293,7 @@ while True:
   #that we will not spuriously wake up from select()
   timeoutQueueLock.acquire()
   while timeoutQueue:
-    time, channel, obj = timeoutQueue[0]
+    thetime, channel, obj = timeoutQueue[0]
     if hasattr(obj, 'isCancelled') and obj.isCancelled:
       heapq.heappop(timeoutQueue)
     else:
@@ -292,6 +316,7 @@ while True:
                   potential_readers,
                   potential_writers,
                   potential_errs)
+    
     currTime = time.time()
   except select.error as e:
     currTime = time.time()
@@ -309,7 +334,7 @@ while True:
         socketMapLock.acquire()
         if readsock in nonServerSockets.keys():
           buf, timeout = nonServerSockets[readsock]
-          if timeout != None
+          if timeout != None:
             timeout.isCancelled = True
           del nonServerSockets[readsock]
           socketMapLock.release()
@@ -334,7 +359,7 @@ while True:
       except select.error as e:
         socketMapLock.acquire()
         buf, timeout = nonServerSockets[writesock]
-        if timeout != None
+        if timeout != None:
           timeout.isCancelled = True
         del nonServerSockets[writesock]
         socketMapLock.release()
@@ -345,42 +370,6 @@ while True:
     #now that offending sockets are corrected,
     #loop back and select() again
     continue
-
-  #let's deliver all timeout events now
-  timeoutQueueLock.acquire()
-  while timeoutQueue:
-    time, channel, obj = heapq.heappop(timeoutQueue)
-    if hasattr(obj, 'isCancelled') and obj.isCancelled:
-      #we encountered a cancelled event, ignore it
-      continue
-    if time > currTime + timeDelta:
-      #all remaining events on queue are in the future,
-      #so nothing more to do
-      break;
-    if channel > 0:
-      if channel == -1:
-        #timeout related to sending sockets
-        sock = obj.socket
-        #basically, there has been data on this socket
-        #for the entire timeout period, but it has not
-        #been available to send, so we tear down
-        #IMPORTANT: Don't deliver an event while holding
-        #the timeoutQueue lock, this could lead to deadlock!!!
-        timeoutQueueLock.release()
-        doSocketDisposal(sock)
-        outputSynchronizationLock.acquire()
-        tcpConnectionLost(sock)
-        outputSynchronizationLock.release()
-        socketMapLock.acquire()
-        del nonServerSockets[sock]
-        socketMapLock.release()
-        timeoutQueueLock.acquire()
-      else:
-        raise RuntimeError("Timeout occurred on unexpected channel: {}".format(channel))
-    else:
-      #this is an upper layer timeout event
-      timeoutExpired(channel, obj)
-  timeoutQueueLock.release()
 
   for readsocket in ready_to_read:
     if readsocket == httpServerSocket or readsocket == torServerSocket:
@@ -410,7 +399,7 @@ while True:
           outputSynchronizationLock.acquire()
           newTorTcpConnection(conn)
           outputSynchronizationLock.release()
-      except socket.err as e:
+      except sox.error as e:
         #I think this happens if there is
         #no data on the socket which shouldn't
         #happen but anyways
@@ -424,7 +413,7 @@ while True:
           if dat:
             #send data along to upper layer(s)
             outputSynchronizationLock.acquire()
-            dataArrivedOnTcpConnection(dat)
+            dataArrivedOnTcpConnection(readsocket, dat)
             outputSynchronizationLock.release()
           else:
             #This indicates that the other side
@@ -438,12 +427,12 @@ while True:
             doSocketDisposal(readsocket)
             #need to remove from hashmap
             socketMapLock.acquire()
-            buf, timeout = nonServerSockets[socket]
-            if timeout != None
+            buf, timeout = nonServerSockets[readsocket]
+            if timeout != None:
               timeout.isCancelled = True
             del nonServerSockets[readsocket]
             socketMapLock.release()
-        except socket.err as e:
+        except sox.error as e:
           #some error with the socket, let's
           #assume that this TCP connection
           #is bad
@@ -452,15 +441,16 @@ while True:
           outputSynchronizationLock.release()
           doSocketDisposal(readsocket)
           socketMapLock.acquire()
-          buf, timeout = nonServerSockets[socket]
-          if timeout != None
+          buf, timeout = nonServerSockets[readsocket]
+          if timeout != None:
             timeout.isCancelled = True
           del nonServerSockets[readsocket]
           socketMapLock.release()
       else:
         socketMapLock.release()
-        #This should actually never happen
-        raise RuntimeError("unknown socket ready for read from select call")
+        #this happens if we delivered events to a higher layer,
+        #and in response it shut down one of the connections
+        #that had read data, so actually do nothing
 
   for writesocket in ready_to_write:
     #we'll just keep the socket map lock for the
@@ -489,20 +479,20 @@ while True:
             doTimeoutSchedule(socketWriteTimoutSecs, -1, timeout)
           else:
             timeout = None
-          nonServerSockets[writesocket] = (data, timeout)
-          socketMapLock.release()
-      except socket.err as e:
+          nonServerSockets[writesocket] = (dat, timeout)
+        socketMapLock.release()
+      except sox.error as e:
         #some error with the socket, let's
         #assume that this TCP connection
         #is bad
         outputSynchronizationLock.acquire()
-        tcpConnectionLost(readsocket)
+        tcpConnectionLost(writesocket)
         outputSynchronizationLock.release()
-        doSocketDisposal(readsocket)
-        buf, timeout = nonServerSockets[socket]
-        if timeout != None
+        doSocketDisposal(writesocket)
+        buf, timeout = nonServerSockets[writesocket]
+        if timeout != None:
           timeout.isCancelled = True
-        del nonServerSockets[readsocket]
+        del nonServerSockets[writesocket]
         socketMapLock.release()
     else:
       #this can only happen if the socket was
@@ -511,6 +501,45 @@ while True:
       #so just ignore it
       pass
       socketMapLock.release()
+
+  #let's deliver all timeout events now
+  currTime = time.time()
+  timeoutQueueLock.acquire()
+  while timeoutQueue:
+    thetime, channel, obj = heapq.heappop(timeoutQueue)
+    if hasattr(obj, 'isCancelled') and obj.isCancelled:
+      #we encountered a cancelled event, ignore it
+      continue
+    if thetime > currTime + timeDelta:
+      #all remaining events on queue are in the future,
+      #so nothing more to do
+      break;
+    if channel > 0:
+      if channel == -1:
+        #print "SOCKET BEING DESTROYED DUE TO WRITE TIMEOUT!!!"
+        #timeout related to sending sockets
+        sock = obj.socket
+        #basically, there has been data on this socket
+        #for the entire timeout period, but it has not
+        #been available to send, so we tear down
+        #IMPORTANT: Don't deliver an event while holding
+        #the timeoutQueue lock, this could lead to deadlock!!!
+        timeoutQueueLock.release()
+        doSocketDisposal(sock)
+        outputSynchronizationLock.acquire()
+        tcpConnectionLost(sock)
+        outputSynchronizationLock.release()
+        socketMapLock.acquire()
+        del nonServerSockets[sock]
+        socketMapLock.release()
+        timeoutQueueLock.acquire()
+      else:
+        raise RuntimeError("Timeout occurred on unexpected channel: {}".format(channel))
+    else:
+      #this is an upper layer timeout event
+      timeoutExpired(channel, obj)
+  timeoutQueueLock.release()
+
 
 
 

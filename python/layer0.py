@@ -56,8 +56,13 @@ httpServerSocket = constructServerSocket(httpTcpPornum)
 torServerSocket = constructServerSocket(torTcpPortnum)
 
 #non-server sockets, key is actual socket, value
-#is python string representing data that we are waiting
-#to send
+#is (string, object) pair.  The string is the write
+#buffer representing data we need to write, the
+#object is a timeout object representing the write
+#timout for this socket.  If the write timeout
+#is None, then there is no timeout.  The reference
+#to this object is retained because it allows us
+#to cancel scheduled timeouts.
 nonServerSockets = {}
 
 #because the creation of a TCP connection involves updating

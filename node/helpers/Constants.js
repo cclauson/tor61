@@ -20,15 +20,13 @@ var relayTypes = {
 	extend_failed : 0x0c
 };
 
-global.MY_GROUP = 0x0455;
-global.MY_AGENT;
-
-// The chances we'll ever have a high enough ID for this
-// to be a problem are astronomically low, but hey, may as
-// well be safe.
-global.MAX_ID = Math.pow(2, 53) - 5;
+var glob = {
+	MY_GROUP : 0x0455,
+	MAX_ID : Math.pow(2, 53) - 5
+}
 
 module.exports = {
 	types : types,
-	relayTypes : relayTypes
+	relayTypes : relayTypes,
+	glob : glob
 };

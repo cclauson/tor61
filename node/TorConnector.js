@@ -2,6 +2,8 @@ var readOps = require('./helpers/CellReadOperations');
 var makeOps = require('./helpers/CellMakeOperations');
 var checkOps = require('./helpers/CellCheckOperations');
 
+var MY_AGENT = require('./helpers/Constants').glob.MY_AGENT;
+
 var removeConnection = require('./TorConnectionManager').removeConnection;
 
 var TorRelayer = require('./TorRelayer').TorRelayer;

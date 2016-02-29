@@ -66,7 +66,7 @@ function TorRelayer(torSocket) {
 	function handleRelay(message) {
 		var circuitNum = readOps.getCircuit(message);
 		// If this circuit is already extended 
-		if(typeof(incomingRoutingTable[circuitNum]) === 'Object') {
+		if(typeof(incomingRoutingTable[circuitNum]) === 'object') {
 			// have a generic relay response handler, or one that switches based on message
 			incomingRoutingTable[circuitNum].sendMessage(torSocket.getID(), message);
 		} else {
@@ -97,7 +97,7 @@ function TorRelayer(torSocket) {
 					// listens for a create success and relays it as a relay extended
 					// and also adds us to incomingRoutingTable
 					establisher.registerHandler(circuitNum, torSocket.getID(), function(status, response) {
-						responseHandler(status, response, circuitNum);
+						responseHandler(status, response, circuitNum, establisher);
 					});
 
 					var create = makeOps.constructCreate(circuitNum);
@@ -126,13 +126,16 @@ function TorRelayer(torSocket) {
 		console.log("RELAY ENDING");
 	}
 
-	function responseHandler(status, message, circuitID) {
+	function responseHandler(status, message, circuitID, establisher) {
 		if(status === 'success') {
 			var type = readOps.getType(message);
 			var toSend;
 			if(type === types.created) {
 				// send extended
 				toSend = makeOps.constructRelayExtended(circuitID, 0);
+				if(incomingRoutingTable[circuitID] === 'primed') {
+					incomingRoutingTable[circuitID] = establisher;
+				}
 			} else if(type === types.create_failed) {
 				// send extend failed
 				toSend = makeOps.constructRelayExtendFailed(circuitID, 0);

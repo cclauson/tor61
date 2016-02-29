@@ -4,14 +4,14 @@ var readOps = require('../helpers/CellReadOperations');
 var makeOps = require('../helpers/CellMakeOperations');
 var packetString = require('../helpers/PacketPrinter').packetString;
 
-var torAgent = 0x11223344;
+var torAgent = 0x4550379;
 
 var agent1 = 1;
 var agent2 = 2;
 
 var torInfo = {
 	host : 'localhost',
-	port : 4448
+	port : 4567
 };
 
 function setUpSock1(otherPort) {
@@ -38,11 +38,11 @@ function setUpSock1(otherPort) {
 			console.log(packetString(data));
 		});
 		var agentBuffer = new Buffer(4);
-		agentBuffer[0] = 0x0;
-		agentBuffer[1] = 0x0;
-		agentBuffer[2] = 0x0;
-		agentBuffer[3] = 0x2;
-		var extend = makeOps.constructRelayExtend(1, 0, 'localhost:' + otherPort + agentBuffer.toString());
+		agentBuffer[0] = 0x04;
+		agentBuffer[1] = 0x55;
+		agentBuffer[2] = 0x00;
+		agentBuffer[3] = 0x65;
+		var extend = makeOps.constructRelayExtend(1, 0, 'localhost:' + 4448 + agentBuffer.toString());
 		sock1.write(extend);
 		console.log("WROTE EXTEND - S1");
 	}

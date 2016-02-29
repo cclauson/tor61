@@ -1,30 +1,32 @@
 var net = require('net');
 
-var constants = require('./helpers/Constants');
+var glob = require('./helpers/Constants').glob;
 
 var registration = require('./registration/Registration');
 var TorSocket = require('./TorSocket').TorSocket;
 var TorConnector = require('./TorConnector').TorConnector;
 
-var id = 1;
+var nextSocketID = 1;
 
 // array of available tor routers
 var availableRouters;
 
-var torPort = parseInt(process.argv[2]);
-var instanceNum = parseInt(process.argv[3]);
-MY_AGENT = (MY_GROUP << 16) + instanceNum;
-
 // map from agent to establisher for ports function
 var existingConnections = {};
 
+var TOR_PORT = glob.TOR_PORT;
+var MY_GROUP = glob.MY_GROUP;
+var MY_INSTANCE = glob.MY_INSTANCE;
+var MY_AGENT = glob.MY_AGENT;
+var MAX_ID = glob.MAX_ID;
+
 var torServer = net.createServer(function(socket) {
-	var torSocket = new TorSocket(socket, id);
-	id = (id + 1) % MAX_ID;
+	var torSocket = new TorSocket(socket, nextSocketID);
+	nextSocketID = (nextSocketID + 1) % MAX_ID;
 	new TorConnector(torSocket, false, registerConnection);
 });
 
-torServer.listen(torPort, function(err) {
+torServer.listen(TOR_PORT, function(err) {
 	if(err) throw err;
 	console.log("Tor server listening on " + torServer.address().address + ":" + torServer.address().port);
 });
@@ -64,8 +66,8 @@ function getConnection(agent, connectionInfo, responseHandler) {
 		responseHandler('success', existingConnections[agent]);
 	} else {
 		var agentSocket = net.createConnection(connectionInfo, function() {
-			var torSocket = new TorSocket(agentSocket, id);
-			id = (id + 1) % MAX_ID;
+			var torSocket = new TorSocket(agentSocket, nextSocketID);
+			nextSocketID = (nextSocketID + 1) % MAX_ID;
 			agentSocket.on('error', failResponse);
 			agentSocket.on('close', failResponse);
 			new TorConnector(torSocket, agent, function(status, establisher, agent) {
@@ -87,16 +89,17 @@ function getConnection(agent, connectionInfo, responseHandler) {
 
 // Register this router on the network
 var group = padZero(MY_GROUP, 4);
-var instance = padZero(instanceNum, 4);
+var instance = padZero(MY_INSTANCE, 4);
 registration.register(torServer.address().port, MY_AGENT, "Tor61Router-" + group + "-" + instance, function(status) {
 	if(status) {
-		// Update our list of available routers every 10 minutes
+		// Update our list of available routers every 5 minutes
 		var setRouters = function(data) {
+			console.log(data);
 			if(data) {
 				availableRouters = data;
 				setTimeout(function() {
 					registration.fetch("Tor61Router-" + group, setRouters);
-				}, 10 * 60 * 1000);
+				}, 5 * 60 * 1000);
 			} else {
 				// Registration service cannot be contacted. Destroy everything.
 			}

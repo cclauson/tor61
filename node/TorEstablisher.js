@@ -1,3 +1,4 @@
+var MAX_ID = require('./helpers/Constants').glob.MAX_ID;
 var types = require('./helpers/Constants').types;
 var readOps = require('./helpers/CellReadOperations');
 var modifyCircuitID = require('./helpers/CellMakeOperations').modifyCircuitID;

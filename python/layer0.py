@@ -99,6 +99,7 @@ def dataArrivedOnTcpConnection(socket, data)
 
 def timeoutExpired(channel, obj):
   #TODO: Handler here...
+  pass
 
 ################## END OUTPUT EVENTS #######################
 
@@ -345,7 +346,12 @@ while True:
   while timeoutQueue:
     time, channel, obj = heapq.heappop(timeoutQueue)
     if hasattr(obj, 'isCancelled') and obj.isCancelled:
+      #we encountered a cancelled event, ignore it
       continue
+    if time > currTime + timeDelta:
+      #all remaining events on queue are in the future,
+      #so nothing more to do
+      break;
     if channel > 0:
       if channel == -1:
         #timeout related to sending sockets

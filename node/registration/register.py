@@ -86,6 +86,10 @@ def ipNumToStr(ip):
 		ipStr = ipStr + "." + str((ip >> (3 - index) * 8) & 0xFF)
 	return ipStr
 
+def printFlush(data):
+	print data
+	sys.stdout.flush()
+
 
 ##################################
 # Packet Class
@@ -136,7 +140,7 @@ def register(servicePort, data, serviceName):
 		if response.getVal(3) != CMD_REGISTERED:
 			printFlush("<<Invalid type, expected Registered")
 		else:
-			sessions[servicePort] = (sent, time.time() + response.getVal(4, 6) - 1)
+			sessions[servicePort] = (sent, time.time() + (response.getVal(4, 6) - 1))
 			printFlush("register_success")
 
 	packet = Packet()
@@ -243,8 +247,7 @@ def sendMessage(packet, typeName, responseHandler):
 	responseHandler(respPacket, packet)
 
 def unknownCommand(*arg):
-	printFlush("<<Unknown Command, please try again")
-	sys.stdout.flush()
+	printFlush(">>Unknown Command, please try again")
 
 
 ##################################
@@ -256,9 +259,10 @@ def unknownCommand(*arg):
 def listenLoop():
 	recvSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	recvSock.bind(('', sendSock.getsockname()[1] + 1))
-
+	printFlush(">>SETTING UP LISTEN LOOP ON PORT " + str(sendSock.getsockname()[1] + 1))
 	while True:
 		data, addr = recvSock.recvfrom(1024)
+		printFlush(">>RECEIVED PACKET FROM LISTEN LOOP")
 		packet = Packet()
 		packet.pushIntArr(map(ord, data))
 		magic = packet.getVal(0, 2)
@@ -266,7 +270,7 @@ def listenLoop():
 		cmd = packet.getVal(3, 4)
 
 		if (magic == MAGIC_NUM) & (cmd == CMD_PROBE):
-			printFlush("<<I've been probed! Sending ACK response.")
+			printFlush(">>I've been probed! Sending ACK response.")
 
 			response = Packet()
 			response.pushVal(MAGIC_NUM, 2)
@@ -280,7 +284,6 @@ listenThread.daemon = True
 listenThread.start()
 
 def reRegisterLoop():
-
 	while True:
 		ports = sessions.keys()
 		for port in ports:
@@ -293,14 +296,13 @@ def reRegisterLoop():
 
 				def responseHandler(response, sent):
 					if response.getVal(3) != CMD_REGISTERED:
-						printFlush("<<Invalid type on re-register, expected Registered")
+						printFlush(">>Invalid type on re-register, expected Registered")
 					else:
 						sessions[port] = (sent, time.time() + response.getVal(4, 6) - 1)
-						printFlush("<<Re-register " + machineIP + ":" + port + " successful: lifetime = " + str(response.getVal(4, 6)))
+						printFlush(">>Re-register " + machineIP + ":" + port + " successful: lifetime = " + str(response.getVal(4, 6)))
 
 				packetInfo[0].refreshHeader()
 				sendMessage(packetInfo[0], "REGISTER", responseHandler)
-
 timeoutThread = threading.Thread(target=reRegisterLoop)
 timeoutThread.daemon = True
 timeoutThread.start()
@@ -320,10 +322,6 @@ dispatcher = {
 	'q' : sys.exit
 }
 
-def printFlush(data):
-	print data
-	sys.stdout.flush()
-
 printFlush("<<regServerIP = " + socket.gethostbyname(serverHost))
 printFlush("<<thisHostIP = " + machineIP)
 
@@ -340,4 +338,4 @@ while True:
 		break
 	# Incorrect number of arguments
 	except (TypeError):
-		printFlush("<<Incorrect number of arguments for " + args[0])
+		printFlush(">>Incorrect number of arguments for " + args[0])

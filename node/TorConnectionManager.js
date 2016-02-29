@@ -8,7 +8,7 @@ var TorConnector = require('./TorConnector').TorConnector;
 
 var id = 1;
 
-// map from agent to connection info
+// array of available tor routers
 var availableRouters;
 
 var torPort = parseInt(process.argv[2]);
@@ -29,8 +29,9 @@ torServer.listen(torPort, function(err) {
 	console.log("Tor server listening on " + torServer.address().address + ":" + torServer.address().port);
 });
 
-function updateAvailableRouters(newAvailableRouters) {
-	availableRouters = newAvailableRouters;
+function getRandomRouter() {
+	var index = Math.floor(Math.random() * availableRouters.length);
+	return availableRouters[index];
 }
 
 // Called when a new socket is created with us as the openee
@@ -111,8 +112,7 @@ function padZero(num, digits) {
 }
 
 module.exports = {
-	updateAvailableRouters : updateAvailableRouters,
-	registerConnection : registerConnection,
+	getRandomRouter : getRandomRouter,
 	getConnection : getConnection,
 	removeConnection : removeConnection
 }

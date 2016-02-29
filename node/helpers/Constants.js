@@ -21,7 +21,7 @@ var relayTypes = {
 };
 
 global.MY_GROUP = 0x0455;
-global.MY_AGENT = 0x04550000;
+global.MY_AGENT;
 
 // The chances we'll ever have a high enough ID for this
 // to be a problem are astronomically low, but hey, may as

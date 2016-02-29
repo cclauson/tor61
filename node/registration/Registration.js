@@ -7,9 +7,11 @@ function setListener(newListener) {
 	removeListener();
 	listener = function(data) {
 		data = trimNewlines(data);
-		if(data[0] !== 0x3c) {
-			var splitData = data.toString().split("\n");
-			for(var i = 0; i < splitData.length; i++) {
+		var splitData = data.toString().split("\n");
+		for(var i = 0; i < splitData.length; i++) {
+			if(splitData[i][0] === '>') {
+				console.log(splitData[i])
+			} else if(splitData[i][0] !== '<') {
 				newListener(splitData[i]);
 			}
 		}
@@ -35,6 +37,10 @@ regService.stderr.on('data', function(data) {
 	console.log("ERROR IN REG SERVICE: " + data.toString());
 });
 
+regService.on('close', function() {
+	console.log("ENDED");
+});
+
 function sendMessage() {
 	var sendString = ""
 	for(var i = 0; i < arguments.length - 1; i++) {
@@ -51,7 +57,6 @@ function register(portnum, agentID, name, callback) {
 		} else {
 			callback(data);
 		}
-		removeListener();
 	});
 	sendMessage("r", portnum, agentID, name);
 }
@@ -63,7 +68,6 @@ function unregister(portnum, callback) {
 		} else {
 			callback(false);
 		}
-		removeListener();
 	});
 	sendMessage("u", portnum);
 }
@@ -73,18 +77,18 @@ function fetch(prefix, callback) {
 	setListener(function(data) {
 		if(data === 'fetch_end') {
 			callback(entries);
-			removeListener();
 		} else {
 			var dataSplit = data.split("\t");
 			if(dataSplit[0] === "fetch_entry") {
 				entries.push({
-					ip : dataSplit[1],
-					port : dataSplit[2],
-					agent : dataSplit[3]
+					connectInfo : {
+						ip : dataSplit[1],
+						port : parseInt(dataSplit[2])
+					},
+					agent : parseInt(dataSplit[3])
 				});
 			} else {
 				callback(false);
-				removeListener();
 			}
 		}
 	});

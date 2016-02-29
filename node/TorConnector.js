@@ -12,8 +12,8 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	// We could just evaluate otherAgent for truthyness, but I prefer this for clarity.
 	var isOpener = (otherAgent) ? true : false;
 
-	var relayer = new TorRelayer(torSocket);
-	var establisher = new TorEstablisher(torSocket, isOpener);
+	var relayer;
+	var establisher;
 
 	// We only get here if we're NOT the opener
 	function handleOpen(message) {
@@ -24,7 +24,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		if(checkOps.validateOpen(message, otherAgent, MY_AGENT)) {
 			var openedCell = makeOps.constructOpened(otherAgent, MY_AGENT);
 			torSocket.write(openedCell);
-			openFinishedCallback('success', establisher);
+			openFinishedCallback('success');
 		} else {
 			var openFailedCell = makeOps.constructOpenFailed(otherAgent, MY_AGENT);
 			torSocket.write(openFailedCell, function() {
@@ -39,7 +39,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		torSocket.removeListener('data', handleOpened);
 		// if message is an open response
 		if(checkOps.validateOpened(message, MY_AGENT, otherAgent)) {
-			openFinishedCallback('success', establisher);
+			openFinishedCallback('success');
 		} else {
 			// kill this socket
 			torSocket.close();
@@ -49,9 +49,11 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
 	// Notifies our callback of whether the open handshake succeeded
 	// If it succeeded, switches us into normal message handling mode
-	function openFinishedCallback(status, establisher) {
+	function openFinishedCallback(status) {
 		if(status === 'success') {
-			openHandshakeCallback('success', establisher.sendMessage, otherAgent);
+			relayer = new TorRelayer(torSocket);
+			establisher = new TorEstablisher(torSocket, isOpener);
+			openHandshakeCallback('success', establisher, otherAgent);
 			torSocket.on('data', normalMessageHandler);
 		} else {
 			openHandshakeCallback(status);

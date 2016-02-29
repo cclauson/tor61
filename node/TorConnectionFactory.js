@@ -6,7 +6,7 @@ var TorConnector = require('./TorConnector').TorConnector;
 // map from agent to connection info
 var availableRouters = initialAvailableRouters;
 
-// map from agent to sendMessage function
+// map from agent to establisher for ports function
 var existingConnections = {};
 
 function updateAvailableRouters(newAvailableRouters) {
@@ -14,41 +14,46 @@ function updateAvailableRouters(newAvailableRouters) {
 }
 
 // Called when a new socket is created with us as the openee
-function registerNewConnection(messageFunction, agent) {
+function registerNewConnection(establisher, agent) {
 	// Special case: ignore if self loop. This is the only case where
 	// we may have multiple TCP connections to the same router. In this
 	// case, we want to keep the value in existingConnections so the same socket
 	// will always be the establisher in all self-loop communication.
-	if(messageFunction && (agent !== MY_AGENT)) {
-		existingConnections[agent] = messageFunction;
+	if(establisher && (agent !== MY_AGENT)) {
+		existingConnections[agent] = establisher;
 	}
 }
 
-// Called when one socket wants to send something to an agent
-// that is not the one it is connected to
-function getConnection(agent, responseHandler) {
+// Called when a TorSocket connection wrapper wants to relay data to a connection
+// it does not already have a circuit set up with.
+function getConnection(agent, connectionInfo, responseHandler) {
 	// if we already have an open TorSocket to the agent
 	if(existingConnections[agent]) {
 		responseHandler('success', existingConnections[agent]);
 	} else {
-		var agentSocket = net.createConnection(availableRouters[agent], function() {
+		var agentSocket = net.createConnection(connectionInfo, function() {
 			var torSocket = new TorSocket(agentSocket, getNewSocketID());
-			new TorConnector(torSocket, agent, function(status, messageFunction, agent) {
+			agentSocket.on('error', failResponse);
+			agentSocket.on('close', failResponse);
+			new TorConnector(torSocket, agent, function(status, establisher, agent) {
 				if(status === 'success') {
-					existingConnections[agent] = messageFunction;
-					responseHandler('success', messageFunction);
+					existingConnections[agent] = establisher;
+					responseHandler('success', establisher);
 				} else {
 					// handshake was not accepted by agent, call responseHandler with error
 					responseHandler('failure');
 				}
+				agentSocket.removeListener('error', failResponse);
+				agentSocket.removeListener('close', failResponse);
 			});
 		});
-
-		agentSocket.on('error', function() {
-			// was unable to connect to agent, call responseHandler with error
-			responseHandler('failure');
-		});
 	}
+
+	var failResponse = function() {
+		agentSocket.removeListener('error', failResponse);
+		agentSocket.removeListener('close', failResponse);
+		responseHandler('failure');
+	};
 }
 
 module.exports = {

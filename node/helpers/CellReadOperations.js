@@ -14,7 +14,7 @@ function getOpenedAgent(cell) {
 	return getData(cell, 7, 11);
 }
 
-function getStreamId(cell) {
+function getStreamID(cell) {
 	return getData(cell, 3, 5);
 }
 
@@ -71,7 +71,7 @@ module.exports = {
 	getCircuit : getCircuit,
 	getOpenerAgent : getOpenerAgent,
 	getOpenedAgent : getOpenedAgent,
-	getStreamId : getStreamId,
+	getStreamID : getStreamID,
 	getPadding : getPadding,
 	getBodyLength : getBodyLength,
 	getRelayCommand : getRelayCommand,

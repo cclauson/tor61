@@ -88,7 +88,7 @@ function TorRelayer(torSocket) {
 		var destination = incomingRoutingTable[circuitNum];
 		if(destination === 'primed') {
 			if(!getConnection) {
-				getConnection = require('./TorConnectionManager').getConnection;
+				getConnection = require('./ConnectionManager').getConnection;
 			}
 			// construct a create from the body, send to correct port based on agent
 			getConnection(readOps.getExtendAgent(message), readOps.getExtendHost(message), function(status, establisher) {

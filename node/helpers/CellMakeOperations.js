@@ -67,6 +67,16 @@ function constructRelayExtendFailed(circuitID, streamID) {
 	return constructRelayHelper(circuitID, streamID, relayTypes.extend_failed);
 }
 
+function constructRelayBody(host, port, agentID) {
+	var bodyBuff = new Buffer(host + ":" + port + "\0");
+	if(agentID !== undefined) {
+		var agentBuff = new Buffer(4);
+		setData(agentBuff, 0, 4, agentID);
+		bodyBuff = Buffer.concat([bodyBuff, agentBuff], bodyBuff.length + agentBuff.length);
+	}
+	return bodyBuff;
+}
+
 function constructOpenHelper(openerAgent, openedAgent, type) {
 	var cell = constructCell(512);
 	setData(cell, 2, 3, type);
@@ -90,9 +100,8 @@ function constructRelayHelper(circuitID, streamID, relay, body) {
 	setData(packet, 3, 5, streamID);
 	setData(packet, 11, 13, body.length);
 	setData(packet, 13, 14, relay);
-	if(body.length > 0) {
-		var bodyBuffer = new Buffer(body);
-		packet = Buffer.concat([packet, bodyBuffer], packet.length + bodyBuffer.length);
+	if(body) {
+		packet = Buffer.concat([packet, body], packet.length + body.length);
 	}
 	var padding = constructCell(512 - (packet.length % 512));
 	packet = Buffer.concat([packet, padding], packet.length + padding.length);
@@ -128,5 +137,6 @@ module.exports = {
 	constructRelayExtend : constructRelayExtend,
 	constructRelayExtended : constructRelayExtended,
 	constructRelayBeginFailed : constructRelayBeginFailed,
-	constructRelayExtendFailed : constructRelayExtendFailed
+	constructRelayExtendFailed : constructRelayExtendFailed,
+	constructRelayBody : constructRelayBody
 };

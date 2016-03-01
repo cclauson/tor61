@@ -1,13 +1,12 @@
 var readOps = require('./helpers/CellReadOperations');
 var makeOps = require('./helpers/CellMakeOperations');
 var checkOps = require('./helpers/CellCheckOperations');
-
-var MY_AGENT = require('./helpers/Constants').glob.MY_AGENT;
-
-var removeConnection = require('./TorConnectionManager').removeConnection;
+var router = require('./RouterManager');
 
 var TorRelayer = require('./TorRelayer').TorRelayer;
 var TorEstablisher = require('./TorEstablisher').TorEstablisher;
+
+var MY_AGENT = require('./helpers/Constants').glob.MY_AGENT;
 
 function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
@@ -25,7 +24,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		torSocket.removeListener('data', handleOpen);
 		otherAgent = readOps.getOpenerAgent(message);
 		// if is open cell
-		if(checkOps.validateOpen(message, otherAgent, MY_AGENT)) {
+		if(checkOps.validateOpen(message, otherAgent, MY_AGENT) && !router.isExistingConnection(otherAgent)) {
 			var openedCell = makeOps.constructOpened(otherAgent, MY_AGENT);
 			torSocket.write(openedCell);
 			openFinishedCallback('success');
@@ -58,7 +57,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
 			torSocket.on('close', function() {
-				removeConnection(otherAgent);
+				router.removeConnection(otherAgent);
 				relayer.cleanup();
 				establisher.cleanup();
 			});

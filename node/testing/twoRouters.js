@@ -56,7 +56,7 @@ var respondToCreated = function(data) {
 	// agentBuffer[3] = 0xE1;
 	// var tempBuf = new Buffer('localhost:' + 7654);
 	// var body = Buffer.concat([tempBuf, agentBuffer], tempBuf.length + agentBuffer.length);
-	var extend = makeOps.constructRelayExtend(1, 0, body);
+	var extend = makeOps.constructRelayExtend(1, body);
 	setNextEnter(function() {
 		sock.write(extend);
 		console.log("Wrote extend to other router");
@@ -82,7 +82,7 @@ var respondToExtended = function(data) {
 	// agentBuffer[3] = 0xD2;
 	// var tempBuf = new Buffer('localhost:' + 4567);
 	// var body = Buffer.concat([tempBuf, agentBuffer], tempBuf.length + agentBuffer.length);
-	var extend = makeOps.constructRelayExtend(1, 0, body);
+	var extend = makeOps.constructRelayExtend(1, body);
 	setNextEnter(function() {
 		sock.write(extend);
 		console.log("Wrote extend back to this router");

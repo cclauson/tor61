@@ -51,16 +51,17 @@ registration.register(TOR_PORT, MY_AGENT, "Tor61Router-" + group + "-" + instanc
 			console.log(data);
 			if(data) {
 				availableRouters = data;
-				setTimeout(function() {
-					registration.fetch("Tor61Router-" + group, setRouters);
-				}, 5 * 60 * 1000);
 			} else {
-				// Registration service cannot be contacted. Destroy everything.
+				console.log("Unable to reach registration service");
 			}
+			setTimeout(function() {
+				registration.fetch("Tor61Router-" + group, setRouters);
+			}, 5 * 60 * 1000);
 		}
 		registration.fetch("Tor61Router-" + group, setRouters);
 	} else {
-		// Registration service cannot be contacted. Destroy everything.
+		console.log("Unable to reach registration service for initial fetch. Exiting.");
+		process.exit();
 	}
 });
 

@@ -38,8 +38,6 @@ function getConnection(agent, connectionInfo, responseHandler) {
 		var agentSocket = net.createConnection(connectionInfo, function() {
 			var torSocket = new TorSocket(agentSocket, nextSocketID);
 			nextSocketID = (nextSocketID + 1) % MAX_ID;
-			agentSocket.on('error', failResponse);
-			agentSocket.on('close', failResponse);
 			new TorConnector(torSocket, agent, function(status, establisher, agent) {
 				if(status === 'success') {
 					routers.registerConnection('success', establisher, agent);

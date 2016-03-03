@@ -26,7 +26,7 @@ function TorRelayer(torSocket) {
 		} else if(type === types.destroy) {
 			handleDestroy(message);
 		} else {
-			console.log("invalid type: " + type);
+			console.log("Received invalid type message for an unmade circuit: " + type);
 		}
 	};
 
@@ -103,14 +103,12 @@ function TorRelayer(torSocket) {
 					var create = makeOps.constructCreate(circuitNum);
 					establisher.sendMessage(torSocket.getID(), create);
 				} else {
-					var streamID = readOps.getStreamID(message);
-					var extendFailed = makeOps.constructRelayExtendFailed(circuitNum, streamID);
+					var extendFailed = makeOps.constructRelayExtendFailed(circuitNum);
 					torSocket.write(extendFailed);
 				}
 			});
 		} else {
-			var streamID = readOps.getStreamID(message);
-			var extendFailed = makeOps.contructRelayExtendFailed(circuitNum, streamID);
+			var extendFailed = makeOps.constructRelayExtendFailed(circuitNum);
 			torSocket.write(extendFailed);
 		}
 	}
@@ -127,18 +125,18 @@ function TorRelayer(torSocket) {
 	}
 
 	function responseHandler(status, message, circuitID, establisher) {
-		if(status === 'success') {
+		if(status === 'success' || status === 'failure') {
 			var type = readOps.getType(message);
 			var toSend;
 			if(type === types.created) {
 				// send extended
-				toSend = makeOps.constructRelayExtended(circuitID, 0);
+				toSend = makeOps.constructRelayExtended(circuitID);
 				if(incomingRoutingTable[circuitID] === 'primed') {
 					incomingRoutingTable[circuitID] = establisher;
 				}
 			} else if(type === types.create_failed) {
 				// send extend failed
-				toSend = makeOps.constructRelayExtendFailed(circuitID, 0);
+				toSend = makeOps.constructRelayExtendFailed(circuitID);
 			} else {
 				// send through
 				toSend = message;

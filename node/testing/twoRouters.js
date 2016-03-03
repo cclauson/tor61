@@ -5,7 +5,7 @@ var readOps = require('../helpers/CellReadOperations');
 var makeOps = require('../helpers/CellMakeOperations');
 var packetString = require('../helpers/PacketPrinter').packetString;
 
-var torAgent = 0x45504D2;
+var torAgent = 0x4550003;
 
 var agent1 = 1;
 var agent2 = 2;
@@ -48,14 +48,7 @@ var respondToCreated = function(data) {
 	console.log();
 	sock.removeListener('data', respondToCreated);
 	sock.on('data', respondToExtended);
-	var body = makeOps.constructRelayBody('localhost', 7654, 0x045510E1);
-	// var agentBuffer = new Buffer(4);
-	// agentBuffer[0] = 0x04;
-	// agentBuffer[1] = 0x55;
-	// agentBuffer[2] = 0x10;
-	// agentBuffer[3] = 0xE1;
-	// var tempBuf = new Buffer('localhost:' + 7654);
-	// var body = Buffer.concat([tempBuf, agentBuffer], tempBuf.length + agentBuffer.length);
+	var body = makeOps.constructRelayBody('localhost', 7654, 0x04550004);
 	var extend = makeOps.constructRelayExtend(1, body);
 	setNextEnter(function() {
 		sock.write(extend);
@@ -74,14 +67,8 @@ var respondToExtended = function(data) {
 		console.log("\nReceived on socket 1:");
 		console.log(packetString(data));
 	});
-	var body = makeOps.constructRelayBody('localhost', 4567, 0x045504D2);
-	// var agentBuffer = new Buffer(4);
-	// agentBuffer[0] = 0x04;
-	// agentBuffer[1] = 0x55;
-	// agentBuffer[2] = 0x04;
-	// agentBuffer[3] = 0xD2;
-	// var tempBuf = new Buffer('localhost:' + 4567);
-	// var body = Buffer.concat([tempBuf, agentBuffer], tempBuf.length + agentBuffer.length);
+	var body = makeOps.constructRelayBody('localhost', 4567, 0x04550003);
+
 	var extend = makeOps.constructRelayExtend(1, body);
 	setNextEnter(function() {
 		sock.write(extend);

@@ -15,6 +15,8 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	// We could just evaluate otherAgent for truthyness, but I prefer this for clarity.
 	var isOpener = (otherAgent) ? true : false;
 
+	var abortTimeout;
+
 	var relayer;
 	var establisher;
 
@@ -54,13 +56,18 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	// If it succeeded, switches us into normal message handling mode
 	function openFinishedCallback(status) {
 		if(status === 'success') {
+			clearTimeout(abortTimeout);
+			torSocket.removeListener('error', abortConnection);
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
-			torSocket.on('close', function() {
+			var cleanup = function() {
+				console.log("Socket closed or errored, cleaning up connections");
 				router.removeConnection(otherAgent);
 				relayer.cleanup();
 				establisher.cleanup();
-			});
+			};
+			torSocket.on('close', cleanup);
+			torSocket.on('error', cleanup);
 			openHandshakeCallback('success', establisher, otherAgent);
 			torSocket.on('data', normalMessageHandler);
 		} else {
@@ -84,6 +91,17 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
 	}
 
+	function abortConnection() {
+		console.log("Did not receive an open / opened in time, closing socket");
+		torSocket.close();
+		if(!isOpener) {
+			openHandshakeCallback('false');
+		}
+	}
+
+	abortTimeout = setTimeout(abortConnection, 3000);
+	torSocket.on('error', abortConnection);
+
 	// openHandshakeCallback is from a getSocket call
 	if(isOpener) {
 		var openCell = makeOps.constructOpen(MY_AGENT, otherAgent);
@@ -95,24 +113,6 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	}
 
 }
-
-// var TorRelayer = function(socket) {
-// 	this.handleMessage = function(message) {
-// 		console.log("MESSAGE RELAYED:");
-// 		console.log(message);
-// 	}
-// };
-
-// var TorEstablisher = function(socket, isOpener) {
-// 	this.isMyCircuit = function(circuitID) {
-// 		return false;
-// 	};
-
-// 	this.handleResponse = function(message) {
-// 		console.log("MESSAGE ESTABLISHED:");
-// 		console.log(message);
-// 	}
-// };
 
 module.exports = {
 	TorConnector : TorConnector

@@ -1,7 +1,10 @@
-var MAX_ID = require('./helpers/Constants').glob.MAX_ID;
-var types = require('./helpers/Constants').types;
+var constants = require('./helpers/Constants');
 var readOps = require('./helpers/CellReadOperations');
-var modifyCircuitID = require('./helpers/CellMakeOperations').modifyCircuitID;
+var makeOps = require('./helpers/CellMakeOperations');
+
+var types = constants.types;
+var relayTypes = constants.relayTypes;
+var MAX_ID = constants.glob.MAX_ID;
 
 // Handles the creation and management of circuits that go out to another
 // router through this socket.
@@ -14,13 +17,17 @@ function TorEstablisher(torSocket, isOpener) {
 
 	// Functions to handle responses for each circuit that this socket
 	// is in charge of
-	// socketID -> function
-	// POTENTIALLY REPLACE WITH socketID -> (function, isWaiting)
+	// circuitID -> function
+	// POTENTIALLY REPLACE WITH circuitID -> (function, isWaiting)
 	var incomingRoutingTable = {};
+
+	// circuitID -> timeout
+	var timeoutTable = {};
 
 	this.cleanup = function() {
 		for(var key in incomingRoutingTable) {
-			incomingRoutingTable('ended');
+			var deleteMessage = makeOps.constructDestroy(key);
+			incomingRoutingTable[key]('ended', deleteMessage);
 		}
 	}
 
@@ -57,13 +64,45 @@ function TorEstablisher(torSocket, isOpener) {
 		// over the socket. Make entry in incomingRouting table between circuitNum and responseHandler
 		// If no responseHandler is passed in, retain the current one. This is only really useful once
 		// a circuit is set up and we want to reuse the handler for sending data back and forth
+
 		var oldCircuitID = readOps.getCircuit(message);
 		var newCircuitID = outgoingRoutingTable[generateKey(oldCircuitID, messagingSocketID)];
 
 		var postWriteCallback;
 
+		// This will only happen if there is an error in the TorRelayer code - issues in
+		// other routers cannot directly cause this.
 		if(isNaN(newCircuitID)) {
 			throw new Error("Did not register handler before sending message");
+		}
+
+		// Update the circuit id
+		makeOps.modifyCircuitID(message, newCircuitID);
+
+		var messageType = readOps.getType(message);
+		var relayType = readOps.getRelayCommand(message);
+
+		// If we expect a response from this message
+		if(messageType !== types.relay || messageType !== types.destroy || (relayType !== relayTypes.end && relayType !== relayTypes.data)) {
+
+			// If we're already waiting for a response on this circuit, print an error and return without sending
+			// This will only occur if some code in 
+			if(timeoutTable[newCircuitID]) {
+				console.log("ALREADY WAITING FOR RESPONSE ON CIRCUIT " + newCircuitID);
+				var response = makeOps.constructMatchingFailure(message);
+				incomingRoutingTable[key]('failure', response);
+			}
+
+			// After writing, set a timeout for receiving a response
+			postWriteCallback = function() {
+				timeoutTable[newCircuitID] = setTimeout(function() {
+					console.log("Timed out waiting for response, returning failure");
+					var response = makeOps.constructMatchingFailure(readOps.getType(message), readOps.getCircuit(message));
+					console.log("MADE IT PAST RESPONSE CREATION");
+					incomingRoutingTable[newCircuitID]('failure', response);
+					deleteCircuit(oldCircuitID, messagingSocketID);
+				}, 5000);
+			};
 		}
 
 		// If the message we're sending is of type destroy, delete the circuit
@@ -74,9 +113,6 @@ function TorEstablisher(torSocket, isOpener) {
 			};
 		}
 
-		// Update the circuit id
-		modifyCircuitID(message, newCircuitID);
-
 		// Send the message
 		torSocket.write(message, postWriteCallback);
 		
@@ -84,6 +120,8 @@ function TorEstablisher(torSocket, isOpener) {
 
 	this.handleResponse = function(message) {
 		var circuitID = readOps.getCircuit(message);
+		clearTimeout(timeoutTable[circuitID]);
+		delete timeoutTable[circuitID];
 		incomingRoutingTable[circuitID]('success', message);
 	};
 
@@ -96,8 +134,10 @@ function TorEstablisher(torSocket, isOpener) {
 	function deleteCircuit(oldCircuitID, messagingSocketID) {
 		var oldKey = generateKey(oldCircuitID, messagingSocketID)
 		var newID = outgoingRoutingTable[oldKey];
+		console.log("Deleting circuit: " + newID);
 		delete outgoingRoutingTable[oldKey];
-		delete incomingRoutingTable[newID]
+		delete incomingRoutingTable[newID];
+		delete timeoutTable[newID];
 	}
 
 }

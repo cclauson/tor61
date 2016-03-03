@@ -1,4 +1,5 @@
 var constants = require('./Constants');
+
 var types = constants.types;
 var relayTypes = constants.relayTypes;
 
@@ -51,20 +52,20 @@ function constructRelayConnected(circuitID, streamID) {
 	return constructRelayHelper(circuitID, streamID, relayTypes.connected);
 }
 
-function constructRelayExtend(circuitID, streamID, body) {
-	return constructRelayHelper(circuitID, streamID, relayTypes.extend, body);
+function constructRelayExtend(circuitID, body) {
+	return constructRelayHelper(circuitID, 0, relayTypes.extend, body);
 }
 
-function constructRelayExtended(circuitID, streamID) {
-	return constructRelayHelper(circuitID, streamID, relayTypes.extended);
+function constructRelayExtended(circuitID) {
+	return constructRelayHelper(circuitID, 0, relayTypes.extended);
 }
 
 function constructRelayBeginFailed(circuitID, streamID) {
 	return constructRelayHelper(circuitID, streamID, relayTypes.begin_failed);
 }
 
-function constructRelayExtendFailed(circuitID, streamID) {
-	return constructRelayHelper(circuitID, streamID, relayTypes.extend_failed);
+function constructRelayExtendFailed(circuitID) {
+	return constructRelayHelper(circuitID, 0, relayTypes.extend_failed);
 }
 
 function constructRelayBody(host, port, agentID) {
@@ -75,6 +76,21 @@ function constructRelayBody(host, port, agentID) {
 		bodyBuff = Buffer.concat([bodyBuff, agentBuff], bodyBuff.length + agentBuff.length);
 	}
 	return bodyBuff;
+}
+
+function constructMatchingFailure(type, circuitID, relayType, streamID) {
+	console.log("MADE IT TO FUNC");
+	if(type === types.create) {
+		console.log("RETURNING CREATE FAILED");
+		return constructCreateFailed(circuitID);
+	} else if(type === relay) {
+		if(relayType === relayTypes.begin) {
+			return constructRelayBeginFailed(circuitID, streamID);
+		} else if(relayType === relayTypes.extend) {
+			return constructRelayExtendFailed(circuitID);
+		}
+	}
+	return message;
 }
 
 function constructOpenHelper(openerAgent, openedAgent, type) {
@@ -123,6 +139,7 @@ function constructCell(size) {
 
 module.exports = {
 	modifyCircuitID : modifyCircuitID,
+	constructMatchingFailure : constructMatchingFailure,
 	constructOpen : constructOpen,
 	constructOpened : constructOpened,
 	constructOpenFailed : constructOpenFailed,

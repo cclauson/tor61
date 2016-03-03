@@ -34,11 +34,14 @@ function trimNewlines(data) {
 }
 
 regService.stderr.on('data', function(data) {
-	console.log("ERROR IN REG SERVICE: " + data.toString());
+	console.log("Error in registration service. Either the server is down, or you are not connected to the internet.");
+	console.log("Closing Router...");
+	process.exit();
 });
 
 regService.on('close', function() {
-	console.log("ENDED");
+	console.log("Registration service exited, closing router.");
+	process.exit();
 });
 
 function sendMessage() {

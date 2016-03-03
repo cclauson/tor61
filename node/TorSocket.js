@@ -25,7 +25,8 @@ function TorSocket(socket, id) {
 	// with this wrapper class for the data event
 	this.on = function(event, handler) {
 		if(event !== 'data') {
-			socket.on.apply(this, arguments);
+			//socket.on.apply(this, arguments);
+			socket.on(event, handler);
 		} else {
 			dataListener = handler;
 			// If we have any unsent data in the output buffer, send
@@ -36,9 +37,10 @@ function TorSocket(socket, id) {
 
 	// Passes the call through to the socket for all events but data,
 	// removes our dataListener if it's a data event
-	this.removeListener = function(event) {
+	this.removeListener = function(event, handler) {
 		if(event !== 'data') {
-			socket.on.apply(this, arguments);
+			//socket.removeListener.apply(this, arguments);
+			socket.removeListener(event, handler);
 		} else {
 			dataListener = false;
 		}

@@ -8,7 +8,8 @@ var routers = require('./RouterManager');
 var TOR_PORT = glob.TOR_PORT;
 var MAX_ID = glob.MAX_ID;
 
-var nextSocketID = 1;
+// socket ID 0 and 1 are reserved for HTTP connection managers
+var nextSocketID = 2;
 
 var torServer = net.createServer(function(socket) {
 	var torSocket = new TorSocket(socket, nextSocketID);

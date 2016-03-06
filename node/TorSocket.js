@@ -4,11 +4,11 @@ var readOps = require('./helpers/CellReadOperations');
 
 var packetString = require('./helpers/PacketPrinter').packetString;
 
-var allSockets = {};
+// var allSockets = {};
 
-setInterval(function() {
-	console.log(Object.keys(allSockets));
-}, 2000);
+// setInterval(function() {
+// 	console.log(Object.keys(allSockets));
+// }, 2000);
 
 // Abstracts the process of splitting TCP stream data into Tor cells
 // We lose some of the functionality of the socket object, but we're
@@ -16,7 +16,7 @@ setInterval(function() {
 // abstraction is worth it.
 function TorSocket(socket, id) {
 
-	allSockets[id] = true;
+	// allSockets[id] = true;
 
 	// The listener to be called when new messages are available
 	var dataListener = false;
@@ -64,7 +64,7 @@ function TorSocket(socket, id) {
 
 	// Passes through close calls to the socket
 	this.close = function(callback) {
-		delete allSockets[id];
+		// delete allSockets[id];
 		socket.end(callback);
 	};
 

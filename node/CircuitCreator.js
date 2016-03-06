@@ -114,17 +114,10 @@ function responseHandler(status, message, establisher) {
 		}
 	} else if(status === 'ended') {
 		for(var key in streams) {
-			removeStream(key);
+			destroyStream(key);
 		}
 		createFirstHop();
 	}
-}
-
-function removeStream(streamID) {
-	if(typeof(streams[key].closeCallback) === 'function') {
-		streams[key].closeCallback();
-	}
-	delete streams[streamID];
 }
 
 function openStream(streamID, host, port, closeCallback) {
@@ -170,7 +163,7 @@ function sendQueue() {
 					circuitEntry.sendMessage(socketID, message);
 				}
 				if(streams[key].status === 'ending') {
-					removeStream(key);
+					destroyStream(key);
 				}
 			// Stream is not created, and is not waiting for a begin response
 			} else if(streams[key].status === 'primed') {
@@ -180,6 +173,13 @@ function sendQueue() {
 			}
 		}
 	}
+}
+
+function destroyStream(streamID) {
+	if(typeof(streams[key].closeCallback) === 'function') {
+		streams[key].closeCallback();
+	}
+	delete streams[streamID];
 }
 
 setInitialCallback(createFirstHop);

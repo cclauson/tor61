@@ -19,12 +19,24 @@ var existingConnections = {};
 var initialFetchCompleted = false;
 var initialCallback;
 
-function getRandomRouter() {
+function getRandomRouter(invalidList) {
+
+	var usefulRouters;
+
+	// If we're passed in an invalid list, only consider entries not in invalidList
+	if(invalidList && invalidList.length > 0) {
+		usefulRouters = availableRouters.filter(function(val) {
+			return invalidList.indexOf(val) === -1;
+		});
+	} else {
+		usefulRouters = availableRouters;
+	}
+
 	// Return connection information for this router if we don't have record of any
 	// other routers. This should only happen if there's an issue with the registration
 	// service or our connection to the registration service - this behavior is better
 	// than crashing or erroring.
-	if(availableRouters.length === 0) {
+	if(usefulRouters.length === 0) {
 		return {
 			connectInfo : {
 				ip : glob.TOR_IP,
@@ -35,9 +47,9 @@ function getRandomRouter() {
 	}
 
 	// Otherwise, just return a random router
-	var randomVal = Math.random() * availableRouters.length;
+	var randomVal = Math.random() * usefulRouters.length;
 	var index = Math.floor(randomVal);
-	return availableRouters[index];
+	return usefulRouters[index];
 }
 
 function isExistingConnection(agent) {

@@ -42,8 +42,8 @@ function createFirstHop() {
 	streams = {};
 	circuitEntry = undefined;
 	circuitLength = 0;
-	var router = getRandomRouter();
-	getConnection(router.agent, router.connectInfo, function(status, establisher) {
+	lastRouter = getRandomRouter(invalidList);
+	getConnection(lastRouter.agent, lastRouter.connectInfo, function(status, establisher) {
 		// if we did not successfully connect
 		if(status === 'failure') {
 			// try again
@@ -60,10 +60,13 @@ function createFirstHop() {
 	});
 }
 
+var lastRouter;
+var invalidList = [];
+
 // Sends an extend message to a random router through our existing partial circuit
 function extendCircuit() {
-	var router = getRandomRouter();
-	var extendBody = makeOps.constructRelayBody(router.connectInfo.ip, router.connectInfo.port, router.agent);
+	lastRouter = getRandomRouter();
+	var extendBody = makeOps.constructRelayBody(lastRouter.connectInfo.ip, lastRouter.connectInfo.port, lastRouter.agent);
 	var extend = makeOps.constructRelayExtend(circuitID, extendBody);
 	circuitEntry.sendMessage(socketID, extend);
 }
@@ -88,6 +91,7 @@ function responseHandler(status, message, establisher) {
 				// success for extended
 				circuitLength++;
 				extendFailedCounter = 0;
+				invalidList = [];
 				if(circuitLength < COMPLETED_CIRCUIT_LENGTH) {
 					extendCircuit();
 				} else {
@@ -99,17 +103,21 @@ function responseHandler(status, message, establisher) {
 				extendFailedCounter++;
 				if(extendFailedCounter > 10) {
 					console.log("Ten consecutive failures on extending, restarting circuit");
+					invalidList = [];
 					createFirstHop();
 				}
+				invalidList.push(lastRouter);
 				extendCircuit();
 			}
 		} else if(type === types.created) {
 			// success for first hop
 			circuitEntry = establisher;
 			circuitLength = 1;
+			invalidList = [];
 			extendCircuit();
 		} else if(type === types.create_failed) {
 			// failure for first hop
+			invalidList.push(lastRouter);
 			createFirstHop();
 		}
 	} else if(status === 'ended') {

@@ -18,7 +18,6 @@ function TorEstablisher(torSocket, isOpener) {
 	// Functions to handle responses for each circuit that this socket
 	// is in charge of
 	// circuitID -> function
-	// POTENTIALLY REPLACE WITH circuitID -> (function, isWaiting)
 	var incomingRoutingTable = {};
 
 	// circuitID -> timeout

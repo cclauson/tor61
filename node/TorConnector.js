@@ -32,6 +32,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		} else {
 			var openFailedCell = makeOps.constructOpenFailed(otherAgent, MY_AGENT);
 			torSocket.write(openFailedCell, function() {
+				clearTimeout(abortTimeout);
 				torSocket.close();
 			});
 		}
@@ -59,10 +60,11 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
 			var cleanup = function() {
-				console.log("Socket closed or errored, cleaning up connections");
+				console.log("Socket " + torSocket.getID() + " closed or errored, cleaning up connections");
 				router.removeConnection(otherAgent);
 				relayer.cleanup();
 				establisher.cleanup();
+				torSocket.close();
 			};
 			torSocket.on('close', cleanup);
 			torSocket.on('error', cleanup);

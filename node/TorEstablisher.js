@@ -45,14 +45,16 @@ function TorEstablisher(torSocket, isOpener) {
 			// if the message we're receiving back is of type destroy
 			if(readOps.getType(message) === types.destroy || readOps.getType(message) === types.create_failed) {
 				deleteCircuit(oldCircuitID, messagingSocketID);
+				return "ended";
 			}
+			return status;
 		}
 
 		outgoingRoutingTable[key] = nextID;
 
 		incomingRoutingTable[nextID] = function(status, message) {
-			responseHousekeeping(status, message);
-			responseHandler(status, message);
+			var newStatus = responseHousekeeping(status, message);
+			responseHandler(newStatus, message);
 		};
 
 		nextID = (nextID + 2) % MAX_ID;
@@ -98,7 +100,6 @@ function TorEstablisher(torSocket, isOpener) {
 				timeoutTable[newCircuitID] = setTimeout(function() {
 					console.log("Timed out waiting for response, returning failure");
 					var response = makeOps.constructMatchingFailure(readOps.getType(message), readOps.getCircuit(message));
-					console.log("MADE IT PAST RESPONSE CREATION");
 					incomingRoutingTable[newCircuitID]('failure', response);
 					deleteCircuit(oldCircuitID, messagingSocketID);
 				}, 5000);
@@ -134,7 +135,7 @@ function TorEstablisher(torSocket, isOpener) {
 	function deleteCircuit(oldCircuitID, messagingSocketID) {
 		var oldKey = generateKey(oldCircuitID, messagingSocketID)
 		var newID = outgoingRoutingTable[oldKey];
-		console.log("Deleting circuit: " + newID);
+		console.log("Destroying circuit " + newID + " on socket " + torSocket.getID());
 		delete outgoingRoutingTable[oldKey];
 		delete incomingRoutingTable[newID];
 		delete timeoutTable[newID];

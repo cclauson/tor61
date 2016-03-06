@@ -30,14 +30,14 @@ function packetString(cell) {
 
 	cellString += "Type: 0x" + type.toString(16) + " (" + reverseTypes[type] + ")";
 
-	cellString += "\n";
-
 	if(type === types.open || type === types.opened || type === types.open_failed) {
+		cellString += "\n";
 		var openerID = readOps.getOpenerAgent(cell);
 		var openedID = readOps.getOpenedAgent(cell);
 		cellString += "Opener Agent: 0x" + openerID.toString(16) + "\n";
-		cellString += "Opened Agent: 0x" + openedID.toString(16) + "\n";
+		cellString += "Opened Agent: 0x" + openedID.toString(16);
 	} else if(type === types.relay) {
+		cellString += "\n";
 		var streamID = readOps.getStreamID(cell);
 		var padding = readOps.getPadding(cell);
 		var bodyLength = readOps.getBodyLength(cell);
@@ -48,7 +48,7 @@ function packetString(cell) {
 		cellString += "Padding: 0x" + padding.toString(16) + "\n";
 		cellString += "Body Length: 0x" + bodyLength.toString(16) + "\n";
 		cellString += "Relay Command: 0x" + relayCommand.toString(16) + " (" + reverseRelayTypes[relayCommand] + ")\n";
-		cellString += "Body: " + body + "\n";
+		cellString += "Body: " + body;
 	}
 
 	return cellString;

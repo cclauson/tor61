@@ -48,7 +48,9 @@ function TorSocket(socket, id) {
 
 	// Passes write calls to the socket
 	this.write = function(data, callback) {
-		console.log("\nWriting on Socket " + id + ":\n" + packetString(data));
+		console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+		console.log("Writing on Socket " + id + ":\n" + packetString(data));
+		console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 		socket.write(data, callback);
 	};
 
@@ -124,7 +126,9 @@ function TorSocket(socket, id) {
 				break;
 			}
 			var nextPacket = outputBuffer.shift();
-			console.log("\nReceived on Socket " + id + ":\n" + packetString(nextPacket));
+			console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+			console.log("Received on Socket " + id + ":\n" + packetString(nextPacket));
+			console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 			dataListener(nextPacket);
 		}
 	}

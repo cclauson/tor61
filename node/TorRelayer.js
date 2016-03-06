@@ -45,6 +45,7 @@ function TorRelayer(torSocket) {
 		var establisher = incomingRoutingTable[circuitID];
 		// If we have a circuit for this ID
 		if(establisher) {
+			console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
 			// Delete it from our records
 			delete incomingRoutingTable[circuitID];
 			// Pass it along
@@ -78,6 +79,8 @@ function TorRelayer(torSocket) {
 				handleRelayEnd(message);
 			} else if(relayType === relayTypes.extend) {
 				handleRelayExtend(message);
+			} else if(relayType === relayTypes.data) {
+				handleRelayData(message);
 			}
 		}
 	}
@@ -117,6 +120,10 @@ function TorRelayer(torSocket) {
 		// create our http connection
 		// respond with a connected or begin failed
 		console.log("RELAY BEGINNING");
+		var circuitID = readOps.getCircuit(message);
+		var streamID = readOps.getStreamID(message);
+		var response = makeOps.constructRelayConnected(circuitID, streamID);
+		torSocket.write(response);
 	}
 
 	function handleRelayEnd(message) {
@@ -124,34 +131,46 @@ function TorRelayer(torSocket) {
 		console.log("RELAY ENDING");
 	}
 
+	function handleRelayData(message) {
+		// pass along the data
+		console.log("RELAY DATA");
+	}
+
 	function responseHandler(status, message, circuitID, establisher) {
+		var type = readOps.getType(message);
+		var toSend;
+
 		if(status === 'success' || status === 'failure') {
-			var type = readOps.getType(message);
-			var toSend;
+
 			if(type === types.created) {
 				// send extended
 				toSend = makeOps.constructRelayExtended(circuitID);
 				if(incomingRoutingTable[circuitID] === 'primed') {
 					incomingRoutingTable[circuitID] = establisher;
 				}
-			} else if(type === types.create_failed) {
-				// send extend failed
-				toSend = makeOps.constructRelayExtendFailed(circuitID);
 			} else {
 				// send through
 				toSend = message;
 				makeOps.modifyCircuitID(toSend, circuitID);
 			}
-			torSocket.write(toSend, function() {
-				if(type === types.destroy) {
-					delete incomingRoutingTable[circuitID];
-				}
-			});
+
 		} else if(status === 'ended') {
-			var destroy = makeOps.constructDestroy(circuitID);
-			torSocket.write(destroy);
-			delete incomingRoutingTable[circuitID];
+
+			if(type === types.create_failed) {
+				// send extend failed
+				toSend = makeOps.constructRelayExtendFailed(circuitID);
+			} else {
+				toSend = makeOps.constructDestroy(circuitID);
+			}
+
 		}
+
+		torSocket.write(toSend, function() {
+			if(type === types.destroy) {
+				console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
+				delete incomingRoutingTable[circuitID];
+			}
+		});
 	}
 
 }

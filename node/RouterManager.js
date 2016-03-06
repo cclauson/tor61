@@ -7,13 +7,32 @@ var MY_GROUP = glob.MY_GROUP;
 var MY_INSTANCE = glob.MY_INSTANCE;
 
 // array of available tor routers
-var availableRouters;
+var availableRouters = [];
 
 // map from agent to establisher for ports function
 var existingConnections = {};
 
+var initialFetchCompleted = false;
+var initialCallback;
+
 function getRandomRouter() {
-	var index = Math.floor(Math.random() * availableRouters.length);
+	// Return connection information for this router if we don't have record of any
+	// other routers. This should only happen if there's an issue with the registration
+	// service or our connection to the registration service - this behavior is better
+	// than crashing or erroring.
+	if(availableRouters.length === 0) {
+		return {
+			connectInfo : {
+				ip : glob.TOR_IP,
+				port : TOR_PORT
+			},
+			agent : MY_AGENT
+		}
+	}
+	
+	// Otherwise, just return a random router
+	var randomVal = Math.random() * availableRouters.length;
+	var index = Math.floor(randomVal);
 	return availableRouters[index];
 }
 
@@ -23,11 +42,7 @@ function isExistingConnection(agent) {
 
 // Called when a new socket is created with us as the openee
 function registerConnection(status, establisher, agent) {
-	// Special case: ignore if self loop. This is the only case where
-	// we may have multiple TCP connections to the same router. In this
-	// case, we want to keep the value in existingConnections so the same socket
-	// will always be the establisher in all self-loop communication.
-	if(establisher && (agent !== MY_AGENT)) {
+	if(establisher) {
 		existingConnections[agent] = establisher;
 	}
 }
@@ -36,38 +51,82 @@ function removeConnection(agent) {
 	delete existingConnections[agent];
 }
 
+function initialSetupCallback() {
+	if(typeof(initialCallback) === 'function') {
+		initialCallback();
+	}
+}
+
+function setInitialCallback(func) {
+	if(initialFetchCompleted) {
+		func();
+	} else {
+		initialCallback = func;
+	}
+}
+
 function padZero(num, digits) {
 	return String('00000000'+num.toString(16)).slice(-digits);
+}
+
+function printRouters(data) {
+	console.log("Available Routers:");
+	for(var i = 0; i < data.length; i++) {
+		var router = data[i];
+		var team = "0x" + padZero(router.agent >> 16, 4);
+		var id = "0x" + padZero(router.agent & 0xFFFF, 4);
+		console.log("\tTeam: " + team + ", ID: " + id + ", IP: " + router.connectInfo.ip + ", Port: " + router.connectInfo.port);
+	}
 }
 
 // Register this router on the network
 var group = padZero(MY_GROUP, 4);
 var instance = padZero(MY_INSTANCE, 4);
 
-registration.register(TOR_PORT, MY_AGENT, "Tor61Router-" + group + "-" + instance, function(status) {
-	if(status) {
-		// Update our list of available routers every 5 minutes
-		var setRouters = function(data) {
-			console.log(data);
-			if(data) {
-				availableRouters = data;
-			} else {
-				console.log("Unable to reach registration service");
+var failCounter = 0;
+
+function initialFetch() {
+	registration.register(TOR_PORT, MY_AGENT, "Tor61Router-" + group + "-" + instance, function(status) {
+		if(status) {
+			// Update our list of available routers every 5 minutes
+			var setRouters = function(data) {
+				if(data) {
+					availableRouters = data;
+					printRouters(data);
+					console.log();
+				} else {
+					console.log("Unable to reach registration service");
+				}
+				setTimeout(function() {
+					registration.fetch("Tor61Router-" + group, setRouters);
+				}, 5 * 60 * 1000);
 			}
-			setTimeout(function() {
-				registration.fetch("Tor61Router-" + group, setRouters);
-			}, 5 * 60 * 1000);
+			registration.fetch("Tor61Router-" + group, function(data) {
+				setRouters(data);
+				initialFetchCompleted = true;
+				initialSetupCallback();
+			});
+		} else {
+			console.log("Unable to reach registration service for initial fetch. Retrying...");
+			failCounter++;
+			if(failCounter >= 3) {
+				process.exit();
+			}
+			initialFetch();
 		}
-		registration.fetch("Tor61Router-" + group, setRouters);
-	} else {
-		console.log("Unable to reach registration service for initial fetch. Exiting.");
-		process.exit();
-	}
+	});
+}
+
+initialFetch();
+
+process.on('exit', function() {
+	registration.unregister(TOR_PORT);
 });
 
 module.exports = {
 	getRandomRouter : getRandomRouter,
 	isExistingConnection : isExistingConnection,
 	registerConnection : registerConnection,
-	removeConnection : removeConnection
-}
+	removeConnection : removeConnection,
+	setInitialCallback : setInitialCallback
+};

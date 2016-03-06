@@ -22,7 +22,6 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
 	// We only get here if we're NOT the opener
 	function handleOpen(message) {
-		console.log('open callback');
 		torSocket.removeListener('data', handleOpen);
 		otherAgent = readOps.getOpenerAgent(message);
 		// if is open cell
@@ -40,7 +39,6 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
 	// We only get here if we ARE the opener
 	function handleOpened(message) {
-		console.log('opened callback');
 		torSocket.removeListener('data', handleOpened);
 		// if message is an open response
 		if(checkOps.validateOpened(message, MY_AGENT, otherAgent)) {
@@ -55,8 +53,8 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	// Notifies our callback of whether the open handshake succeeded
 	// If it succeeded, switches us into normal message handling mode
 	function openFinishedCallback(status) {
+		clearTimeout(abortTimeout);
 		if(status === 'success') {
-			clearTimeout(abortTimeout);
 			torSocket.removeListener('error', abortConnection);
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
@@ -92,7 +90,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	}
 
 	function abortConnection() {
-		console.log("Did not receive an open / opened in time, closing socket");
+		console.log("Did not receive an open / opened in time, closing socket " + torSocket.getID());
 		torSocket.close();
 		if(!isOpener) {
 			openHandshakeCallback('false');

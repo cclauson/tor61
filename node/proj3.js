@@ -6,3 +6,4 @@ glob.MY_AGENT = (glob.MY_GROUP << 16) + glob.MY_INSTANCE;
 
 require("./RouterManager");
 require("./ConnectionManager");
+require("./CircuitCreator");

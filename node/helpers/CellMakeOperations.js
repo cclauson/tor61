@@ -79,11 +79,9 @@ function constructRelayBody(host, port, agentID) {
 }
 
 function constructMatchingFailure(type, circuitID, relayType, streamID) {
-	console.log("MADE IT TO FUNC");
 	if(type === types.create) {
-		console.log("RETURNING CREATE FAILED");
 		return constructCreateFailed(circuitID);
-	} else if(type === relay) {
+	} else if(type === types.relay) {
 		if(relayType === relayTypes.begin) {
 			return constructRelayBeginFailed(circuitID, streamID);
 		} else if(relayType === relayTypes.extend) {

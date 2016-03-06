@@ -22,6 +22,8 @@ torServer.listen(TOR_PORT, function(err) {
 	console.log("Tor server listening on " + torServer.address().address + ":" + torServer.address().port);
 });
 
+glob.TOR_IP = torServer.address().address;
+
 // Called when a TorSocket connection wrapper wants to relay data to a connection
 // it does not already have a circuit set up with.
 function getConnection(agent, connectionInfo, responseHandler) {

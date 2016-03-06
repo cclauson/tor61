@@ -138,6 +138,8 @@ function TorEstablisher(torSocket, isOpener) {
 		console.log("Destroying circuit " + newID + " on socket " + torSocket.getID());
 		delete outgoingRoutingTable[oldKey];
 		delete incomingRoutingTable[newID];
+
+		clearTimeout(timeoutTable[newID]);
 		delete timeoutTable[newID];
 	}
 

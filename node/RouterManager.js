@@ -12,6 +12,10 @@ var availableRouters = [];
 // map from agent to establisher for ports function
 var existingConnections = {};
 
+// setInterval(function() {
+// 	console.log(Object.keys(existingConnections));
+// }, 2000);
+
 var initialFetchCompleted = false;
 var initialCallback;
 
@@ -29,7 +33,7 @@ function getRandomRouter() {
 			agent : MY_AGENT
 		}
 	}
-	
+
 	// Otherwise, just return a random router
 	var randomVal = Math.random() * availableRouters.length;
 	var index = Math.floor(randomVal);

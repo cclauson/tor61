@@ -120,8 +120,11 @@ function TorRelayer(torSocket) {
 	function handleRelayBegin(message) {
 		// create our http connection
 		// respond with a connected or begin failed
-		console.log("RELAY BEGINNING");
 		var connectInfo = readOps.getBodyString(message).split(":");
+		if(parseInt(connectInfo[1]) >= 65535) {
+			console.log("Port is invalid. Fudging to 80.");
+			connectInfo[1] = 80;
+		}
 		var streamID = readOps.getStreamID(message);
 		var circuitID = readOps.getCircuit(message);
 		httpEndpoint.beginStream(torSocket.getID(), circuitID, streamID, connectInfo[0], parseInt(connectInfo[1]), function(type, data) {
@@ -133,7 +136,12 @@ function TorRelayer(torSocket) {
 			} else if(type === 'end') {
 				response = makeOps.constructRelayEnd(circuitID, streamID);
 			} else if(type === 'data') {
-				response = makeOps.constructRelayData(circuitID, streamID, new Buffer(data));
+				for(var i = 0; i < data.length; i += 65535) {
+					var trimmedData = data.slice(i, Math.min(i + 65535, data.length));
+					response = makeOps.constructRelayData(circuitID, streamID, trimmedData);
+					torSocket.write(response);
+				}
+				return;
 			}
 			torSocket.write(response);
 		});
@@ -141,14 +149,12 @@ function TorRelayer(torSocket) {
 
 	function handleRelayEnd(message) {
 		// pass along the end command
-		console.log("RELAY ENDING");
 		var circuitID = readOps.getCircuit(message);
 		httpEndpoint.endStream(torSocket.getID(), circuitID, readOps.getStreamID(message));
 	}
 
 	function handleRelayData(message) {
 		// pass along the data
-		console.log("RELAY DATA");
 		var circuitID = readOps.getCircuit(message);
 		var streamID = readOps.getStreamID(message);
 		var body = readOps.getBodyBuffer(message);

@@ -117,7 +117,7 @@ function constructRelayHelper(circuitID, streamID, relay, body) {
 	if(body) {
 		packet = Buffer.concat([packet, body], packet.length + body.length);
 	}
-	var padding = constructCell(512 - (packet.length % 512));
+	var padding = constructCell((512 - (packet.length % 512)) % 512);
 	packet = Buffer.concat([packet, padding], packet.length + padding.length);
 	return packet;
 }

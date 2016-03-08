@@ -31,12 +31,16 @@ var nextStreamID = 0;
 var RequestHandler = function(socket) {
 
 	var streamID = nextStreamID;
-	nextStreamID++;
+	nextStreamID = (nextStreamID + 1) % glob.MAX_ID;
 
 	var serverSocket;
 
 	// Temporary storage for buffering the data
 	var prevData;
+
+	socket.on('error', function() {
+		socket.end();
+	});
 
 	socket.on('data', handleInitialMessage);
 
@@ -81,17 +85,20 @@ var RequestHandler = function(socket) {
 			socket.on('close', endConnection);
 			socket.on('error', endConnection);
 
+			serverSocket.removeListener('close');
+			serverSocket.on('close', function() {
+				endConnection();
+			});
+
 			// Connect the two sockets
 			serverSocket.on('data', function(data) {
 				socket.write(data);
 			});
 
 			socket.on('data', function(data) {
-				console.log("Writing data to server");
 				serverSocket.write(data);
 			});
 
-			console.log("WRITING SUCCESS TO BROWSER");
 			// Let the browser know the connection is set up
 			socket.write("HTTP/1.1 200 OK\r\n\r\n");
 
@@ -164,7 +171,7 @@ var RequestHandler = function(socket) {
 
 		// If we can't connect to the server, print an error message and close the request.
 		serverSocket.on('close', function() {
-			console.log("Connection closed from " + serverInfo.host + " on port " + serverInfo.port);
+			//console.log("Connection closed from " + serverInfo.host + " on port " + serverInfo.port);
 			endConnection();
 		});
 	}

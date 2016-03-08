@@ -4,6 +4,10 @@ var net = require('net');
 // For example, an HTTP begin that requires us to open an HTTP socket
 // or HTTP Data that needs to go to an open stream
 
+// setInterval(function() {
+// 	console.log("Endpoint Sockets: " + Object.keys(streams).length);
+// }, 5000);
+
 // socketID, streamID -> HTTP socket
 var streams = {};
 
@@ -11,8 +15,8 @@ function beginStream(socketID, circuitID, streamID, ip, port, respond) {
 	var key = generateKey(socketID, circuitID, streamID);
 	var socket = net.createConnection({host : ip, port : port}, function() {
 		
-		socket.removeAllListeners('close');
-		socket.removeAllListeners('error');
+		socket.removeListener('close', beginFailure);
+		socket.removeListener('error', beginFailure);
 
 		socket.on('error', endFailure);
 		socket.on('close', endFailure);
@@ -25,21 +29,21 @@ function beginStream(socketID, circuitID, streamID, ip, port, respond) {
 
 	});
 
-	console.log("BEGINNING STREAM");
+	//console.log("BEGINNING STREAM");
 
 	var beginFailure = function() {
-		socket.removeAllListeners('close');
-		socket.removeAllListeners('error');
-		respond('failed');
+		socket.removeListener('close', endFailure);
+		socket.removeListener('error', endFailure);
 		socket.end();
+		respond('failed');
 		delete streams[key];
 	};
 
 	var endFailure = function() {
-		socket.removeAllListeners('close');
-		socket.removeAllListeners('error');
-		respond('end');
+		socket.removeListener('close', endFailure);
+		socket.removeListener('error', endFailure);
 		socket.end();
+		respond('end');
 		delete streams[key];
 	};
 
@@ -55,8 +59,8 @@ function endStream(socketID, circuitID, streamID) {
 	var key = generateKey(socketID, circuitID, streamID);
 	var socket = streams[key];
 	if(socket) {
-		socket.removeAllListeners('close');
-		socket.removeAllListeners('error');
+		// socket.removeAllListeners('close');
+		// socket.removeAllListeners('error');
 		socket.end();
 		delete streams[key];
 	}
@@ -66,7 +70,6 @@ function receiveData(socketID, circuitID, streamID, data) {
 	var key = generateKey(socketID, circuitID, streamID);
 	var socket = streams[key];
 	if(socket) {
-		console.log("Writing data");
 		socket.write(data);
 	}
 }

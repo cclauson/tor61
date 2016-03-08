@@ -113,12 +113,14 @@ function TorSocket(socket, id) {
 					break;
 				}
 				// otherwise, push the message
-				outputBuffer.push(data.slice(i, end));
+				var packet = data.slice(i, end);
+				outputBuffer.push(packet);
 				// prime i so incrementing will bring us to the next unread cell
 				i = end - 512;
 			} else {
 				// otherwise, just push the cell
-				outputBuffer.push(data.slice(i, i + 512));
+				var packet = data.slice(i, i + 512)
+				outputBuffer.push(packet);
 			}
 		}
 

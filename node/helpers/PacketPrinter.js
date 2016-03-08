@@ -14,7 +14,7 @@ for(var relayType in relayTypes) {
 	reverseRelayTypes[relayTypes[relayType]] = relayType;
 }
 
-function packetString(cell) {
+function packetString(cell, maxBody) {
 
 	var cellString = "";
 
@@ -43,6 +43,10 @@ function packetString(cell) {
 		var bodyLength = readOps.getBodyLength(cell);
 		var relayCommand = readOps.getRelayCommand(cell);
 		var body = readOps.getBodyString(cell);
+
+		if(maxBody !== undefined && maxBody < body.length) {
+			body = body.slice(0, maxBody) + "...";
+		}
 
 		cellString += "Stream ID: 0x" + streamID.toString(16) + "\n";
 		cellString += "Padding: 0x" + padding.toString(16) + "\n";

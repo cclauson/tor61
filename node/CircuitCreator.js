@@ -24,7 +24,7 @@ var streams = {};
 var socketID = 0;
 
 // Increment each time we destroy and remake a circuit
-var circuitID = 0;
+var circuitID = 1;
 
 // The length of a completed circuit
 var COMPLETED_CIRCUIT_LENGTH = 3;
@@ -37,9 +37,13 @@ var circuitLength = 0;
 
 var extendFailedCounter = 0;
 
-function createFirstHop() {
-	circuitID++;
-	streams = {};
+function createFirstHop(isRecreate) {
+	if(isRecreate) {
+		circuitID++;
+		for(var key in streams) {
+			streams[key].updateCircuit(circuitID);
+		}
+	}
 	circuitEntry = undefined;
 	circuitLength = 0;
 	lastRouter = getRandomRouter(invalidList);
@@ -79,14 +83,27 @@ function responseHandler(status, message, establisher) {
 			var streamID = readOps.getStreamID(message);
 			if(relayType === relayTypes.data) {
 				// received data
+				// send to HTTPEndpoint
+				var body = readOps.getBodyBuffer(message);
+				var stream = streams[streamID];
+				if(stream) {
+					stream.respond(body);
+				}
 			} else if(relayType === relayTypes.connected) {
 				// success for stream creation
 				// send everything in request queue for this streamID
-				streams[streamID].status = 'ready';
-				sendQueue();
-			} else if(relayType === relayTypes.begin_failed) {
-				// failure for stream creation
-				delete streams[streamID];
+				if(streams[streamID]) {
+					streams[streamID].status = 'ready';
+					streams[streamID].begin();
+					sendQueue();
+				}
+			} else if(relayType === relayTypes.begin_failed || relayType === relayTypes.end) {
+				// Destroy this stream
+				var stream = streams[streamID];
+				if(stream) {
+					stream.close();
+				}
+				
 			} else if(relayType === relayTypes.extended) {
 				// success for extended
 				circuitLength++;
@@ -104,7 +121,7 @@ function responseHandler(status, message, establisher) {
 				if(extendFailedCounter > 10) {
 					console.log("Ten consecutive failures on extending, restarting circuit");
 					invalidList = [];
-					createFirstHop();
+					createFirstHop(true);
 				}
 				invalidList.push(lastRouter);
 				extendCircuit();
@@ -122,78 +139,139 @@ function responseHandler(status, message, establisher) {
 		}
 	} else if(status === 'ended') {
 		for(var key in streams) {
-			destroyStream(key);
+			streams[key].status = 'primed';
 		}
-		createFirstHop();
+		createFirstHop(true);
 	}
 }
 
-function openStream(streamID, host, port, closeCallback) {
-	streams[streamID] = {};
+function HTTPStream(streamID, host, port, openCallback) {
+
+	var self = this;
+
+	var callbacks = {};
+
+	var beginMessage;
+	var requests = [];
+	var responseQueue = [];
+
+	this.status = 'primed';
+
+	this.updateCircuit = function(newID) {
+		makeOps.modifyCircuitID(beginMessage, newID);
+		for(var i = 0; i < requests.length; i++) {
+			makeOps.modifyCircuitID(requests[i], newID);
+		}
+	};
+
+	this.begin = function() {
+		openCallback();
+	};
+
+	this.pushRequest = function(request) {
+		requests.push(request);
+	};
+
+	this.shiftRequest = function() {
+		return requests.shift();
+	};
+
+	this.getRequestCount = function() {
+		return requests.length;
+	};
+
+	this.getBeginMessage = function() {
+		return beginMessage;
+	};
+
+	this.write = function(data, callback) {
+		if(self.status !== 'closed' && self.status !== 'ending') {
+			var dataCell = makeOps.constructRelayData(circuitID, streamID, new Buffer(data));
+			requests.push(dataCell);
+
+			sendQueue();
+		}
+	};
+
+	this.respond = function(response) {
+		responseQueue.push(response);
+		sendResponseQueue();
+	};
+
+	this.on = function(event, callback) {
+		callbacks[event] = callback;
+	};
+
+	this.removeListener = function(event) {
+		delete callbacks[event];
+	};
+
+	this.end = function() {
+		if(self.status !== 'ending' && self.status !== 'closed') {
+			var streamEnd = makeOps.constructRelayEnd(circuitID, streamID);
+			requests.push(streamEnd);
+			self.status = 'ending';
+
+			sendQueue();
+		}
+	};
+
+	this.close = function(callback) {
+		if(callbacks.close) {
+			callbacks.close();
+			delete streams[streamID];
+			self.status = 'closed';
+		}
+	};
+
+	function sendResponseQueue() {
+		if(callbacks.data) {
+			while(responseQueue.length > 0) {
+				if(!callbacks.data) {
+					return;
+				}
+				var data = responseQueue.shift();
+				callbacks.data(data);
+			}
+		}
+	}
+
 	var body = makeOps.constructRelayBody(host, port);
-	var streamBegin = makeOps.constructRelayBegin(circuitID, streamID, body);
-	streams[streamID].requests.push(streamBegin);
-	streams[streamID].status = 'primed';
-	streams[streamID].closeCallback = closeCallback;
+	beginMessage = makeOps.constructRelayBegin(circuitID, streamID, body);
 
-	sendQueue();
-}
-
-function sendMessage(streamID, data) {
-	if(streams[streamID] && streams[streamID].status !== 'ending') {
-		var dataCell = makeOps.constructRelayData(circuitID, streamID, new Buffer(data));
-		streams[streamID].requests.push(dataCell);
-
-		sendQueue();
-	}
-}
-
-function endStream(streamID) {
-	var streamEnd = makeOps.constructRelayEnd(circuitID, streamID);
-	streams[streamID].requests.push(streamEnd);
-	streams[streamID].status = 'ending';
+	streams[streamID] = this;
 
 	sendQueue();
 }
 
 function sendQueue() {
 	if(circuitLength === COMPLETED_CIRCUIT_LENGTH) {
-		console.log("SENDING QUEUE, CIRCUIT COMPLETE");
+		// console.log("SENDING QUEUE, CIRCUIT COMPLETE");
 		for(var key in streams) {
-			var requestArray = streams[key].requests;
+			var stream = streams[key];
 			// Stream is created
-			if(streams[key].status === 'ready' || streams[key].status === 'ending') {
-				while(requestArray.length > 0) {
+			if(stream.status === 'ready' || stream.status === 'ending') {
+				while(stream.getRequestCount() > 0) {
 					if(circuitLength !== COMPLETED_CIRCUIT_LENGTH) {
 						return;
 					}
-					var message = requestArray.shift();
+					var message = stream.shiftRequest();
 					circuitEntry.sendMessage(socketID, message);
 				}
-				if(streams[key].status === 'ending') {
-					destroyStream(key);
+				if(stream.status === 'ending') {
+					stream.close();
 				}
 			// Stream is not created, and is not waiting for a begin response
-			} else if(streams[key].status === 'primed') {
-				streams[key].status = 'waiting';
-				var beginMessage = requestArray.shift();
-				circuitEntry.sendMessage(socketID, beginMessage);
+			} else if(stream.status === 'primed') {
+				stream.status = 'waiting';
+				circuitEntry.sendMessage(socketID, stream.getBeginMessage());
 			}
 		}
 	}
 }
 
-function destroyStream(streamID) {
-	if(typeof(streams[key].closeCallback) === 'function') {
-		streams[key].closeCallback();
-	}
-	delete streams[streamID];
-}
-
 setInitialCallback(createFirstHop);
 
 module.exports = {
-	openStream : openStream,
-	sendMessage : sendMessage,
-	endStream : endStream
+	HTTPStream : HTTPStream
 };

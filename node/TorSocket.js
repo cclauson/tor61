@@ -1,8 +1,16 @@
 var net = require('net');
 var types = require('./helpers/Constants').types;
+var relayTypes = require('./helpers/Constants').relayTypes;
 var readOps = require('./helpers/CellReadOperations');
 
 var packetString = require('./helpers/PacketPrinter').packetString;
+
+isDebug = true;
+
+function writeCondition(message) {
+	return false;
+	//return readOps.getRelayCommand(message) === relayTypes.begin;
+}
 
 // var allSockets = {};
 
@@ -56,9 +64,11 @@ function TorSocket(socket, id) {
 
 	// Passes write calls to the socket
 	this.write = function(data, callback) {
-		console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-		console.log("Writing on Socket " + id + ":\n" + packetString(data));
-		console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+		if(writeCondition(data)) {
+			console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+			console.log("Writing on Socket " + id + ":\n" + packetString(data, 100));
+			console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+		}
 		socket.write(data, callback);
 	};
 
@@ -135,9 +145,11 @@ function TorSocket(socket, id) {
 				break;
 			}
 			var nextPacket = outputBuffer.shift();
-			console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-			console.log("Received on Socket " + id + ":\n" + packetString(nextPacket));
-			console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+			if(writeCondition(nextPacket)) {
+				console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+				console.log("Received on Socket " + id + ":\n" + packetString(nextPacket, 100));
+				console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+			}
 			dataListener(nextPacket);
 		}
 	}

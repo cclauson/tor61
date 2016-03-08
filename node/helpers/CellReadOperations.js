@@ -40,6 +40,11 @@ function getBodyString(cell) {
 	return getDataAsString(cell, 14, 14 + length);
 }
 
+function getBodyBuffer(cell) {
+	var length = getBodyLength(cell);
+	return cell.slice(14, 14 + length);
+}
+
 function getBeginHost(cell) {
 	var hostString = getBodyString(cell);
 	var hostSplit = hostString.split(":");
@@ -86,6 +91,7 @@ module.exports = {
 	getBodyLength : getBodyLength,
 	getRelayCommand : getRelayCommand,
 	getBody : getBody,
+	getBodyBuffer : getBodyBuffer,
 	getBodyString : getBodyString,
 	getBeginHost : getBeginHost,
 	getExtendHost : getExtendHost,

@@ -5,6 +5,7 @@ var constants = require('./helpers/Constants');
 var readOps = require('./helpers/CellReadOperations');
 var makeOps = require('./helpers/CellMakeOperations');
 var checkOps = require('./helpers/CellCheckOperations');
+var httpEndpoint = require('./HTTPEndpoint');
 var getConnection;
 
 var types = constants.types;
@@ -120,20 +121,38 @@ function TorRelayer(torSocket) {
 		// create our http connection
 		// respond with a connected or begin failed
 		console.log("RELAY BEGINNING");
-		var circuitID = readOps.getCircuit(message);
+		var connectInfo = readOps.getBodyString(message).split(":");
 		var streamID = readOps.getStreamID(message);
-		var response = makeOps.constructRelayConnected(circuitID, streamID);
-		torSocket.write(response);
+		var circuitID = readOps.getCircuit(message);
+		httpEndpoint.beginStream(torSocket.getID(), circuitID, streamID, connectInfo[0], parseInt(connectInfo[1]), function(type, data) {
+			var response;
+			if(type === 'connected') {
+				response = makeOps.constructRelayConnected(circuitID, streamID);
+			} else if(type === 'failed') {
+				response = makeOps.constructRelayBeginFailed(circuitID, streamID);
+			} else if(type === 'end') {
+				response = makeOps.constructRelayEnd(circuitID, streamID);
+			} else if(type === 'data') {
+				response = makeOps.constructRelayData(circuitID, streamID, new Buffer(data));
+			}
+			torSocket.write(response);
+		});
 	}
 
 	function handleRelayEnd(message) {
 		// pass along the end command
 		console.log("RELAY ENDING");
+		var circuitID = readOps.getCircuit(message);
+		httpEndpoint.endStream(torSocket.getID(), circuitID, readOps.getStreamID(message));
 	}
 
 	function handleRelayData(message) {
 		// pass along the data
 		console.log("RELAY DATA");
+		var circuitID = readOps.getCircuit(message);
+		var streamID = readOps.getStreamID(message);
+		var body = readOps.getBodyBuffer(message);
+		httpEndpoint.receiveData(torSocket.getID(), circuitID, streamID, body);
 	}
 
 	function responseHandler(status, message, circuitID, establisher) {

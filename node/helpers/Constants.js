@@ -22,7 +22,7 @@ var relayTypes = {
 
 var glob = {
 	MY_GROUP : 0x0455,
-	MAX_ID : Math.pow(2, 53) - 5
+	MAX_ID : Math.pow(2, 16)
 }
 
 module.exports = {

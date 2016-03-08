@@ -74,7 +74,7 @@ function TorEstablisher(torSocket, isOpener) {
 		// This will only happen if there is an error in the TorRelayer code - issues in
 		// other routers cannot directly cause this.
 		if(isNaN(newCircuitID)) {
-			throw new Error("Did not register handler before sending message");
+			throw new Error("Did not register handler before sending message or circuit in message is malformed");
 		}
 
 		// Update the circuit id
@@ -84,23 +84,30 @@ function TorEstablisher(torSocket, isOpener) {
 		var relayType = readOps.getRelayCommand(message);
 
 		// If we expect a response from this message
-		if(messageType !== types.relay || messageType !== types.destroy || (relayType !== relayTypes.end && relayType !== relayTypes.data)) {
+		// relay that isn't end or data
+		// type that isn't relay or destroy
+		if(messageType !== types.destroy && messageType !== types.relay) {
 
 			// If we're already waiting for a response on this circuit, print an error and return without sending
 			// This will only occur if some code in 
 			if(timeoutTable[newCircuitID]) {
 				console.log("ALREADY WAITING FOR RESPONSE ON CIRCUIT " + newCircuitID);
-				var response = makeOps.constructMatchingFailure(message);
-				incomingRoutingTable[key]('failure', response);
+				var streamID = readOps.getStreamID(message);
+				var response = makeOps.constructMatchingFailure(messageType, newCircuitID, relayType, streamID);
+				incomingRoutingTable[newCircuitID]('failure', response);
 			}
 
 			// After writing, set a timeout for receiving a response
 			postWriteCallback = function() {
 				timeoutTable[newCircuitID] = setTimeout(function() {
-					console.log("Timed out waiting for response, returning failure");
-					var response = makeOps.constructMatchingFailure(readOps.getType(message), readOps.getCircuit(message));
-					incomingRoutingTable[newCircuitID]('failure', response);
-					deleteCircuit(oldCircuitID, messagingSocketID);
+					// console.log("Timed out waiting for response, returning failure");
+					// var type = readOps.getType(message);
+					// var relayType = readOps.getRelayCommand(message);
+					// var streamID = readOps.getStreamID(message);
+					// var response = makeOps.constructMatchingFailure(type, newCircuitID, relayType, streamID);
+					// incomingRoutingTable[newCircuitID]('failure', response);
+					var deleteMessage = makeOps.constructDestroy(newCircuitID);
+					incomingRoutingTable[newCircuitID]('ended', deleteMessage);
 				}, 5000);
 			};
 		}

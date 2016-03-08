@@ -1,3 +1,5 @@
+var LOGGING = require("./helpers/Constants").glob.LOGGING;
+
 var net = require('net');
 var types = require('./helpers/Constants').types;
 var relayTypes = require('./helpers/Constants').relayTypes;
@@ -5,26 +7,13 @@ var readOps = require('./helpers/CellReadOperations');
 
 var packetString = require('./helpers/PacketPrinter').packetString;
 
-isDebug = true;
-
-function writeCondition(message) {
-	return false;
-	//return readOps.getRelayCommand(message) === relayTypes.begin;
-}
-
-// var allSockets = {};
-
-// setInterval(function() {
-// 	console.log(Object.keys(allSockets));
-// }, 2000);
+isDebug = (LOGGING === '-t' || LOGGING === '-a');
 
 // Abstracts the process of splitting TCP stream data into Tor cells
 // We lose some of the functionality of the socket object, but we're
 // unlikely to need anything that isn't already handled here, and the
 // abstraction is worth it.
 function TorSocket(socket, id) {
-
-	// allSockets[id] = true;
 
 	// The listener to be called when new messages are available
 	var dataListener = false;
@@ -64,7 +53,7 @@ function TorSocket(socket, id) {
 
 	// Passes write calls to the socket
 	this.write = function(data, callback) {
-		if(writeCondition(data)) {
+		if(isDebug) {
 			console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 			console.log("Writing on Socket " + id + ":\n" + packetString(data, 100));
 			console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
@@ -147,7 +136,7 @@ function TorSocket(socket, id) {
 				break;
 			}
 			var nextPacket = outputBuffer.shift();
-			if(writeCondition(nextPacket)) {
+			if(isDebug) {
 				console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
 				console.log("Received on Socket " + id + ":\n" + packetString(nextPacket, 100));
 				console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");

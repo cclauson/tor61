@@ -1,3 +1,5 @@
+var LOGGING = require("./helpers/Constants").glob.LOGGING;
+
 var getConnection = require('./ConnectionManager').getConnection;
 var getRandomRouter = require('./RouterManager').getRandomRouter;
 var constants = require('./helpers/Constants');
@@ -37,6 +39,8 @@ var circuitLength = 0;
 
 var extendFailedCounter = 0;
 
+var isDebug = (LOGGING === '-a' || LOGGING === '-c');
+
 function createFirstHop(isRecreate) {
 	if(isRecreate) {
 		circuitID++;
@@ -66,6 +70,8 @@ function createFirstHop(isRecreate) {
 
 var lastRouter;
 var invalidList = [];
+
+var chain = [];
 
 // Sends an extend message to a random router through our existing partial circuit
 function extendCircuit() {
@@ -106,6 +112,10 @@ function responseHandler(status, message, establisher) {
 				
 			} else if(relayType === relayTypes.extended) {
 				// success for extended
+				if(isDebug) {
+					//console.log("Extended to: 0x" + lastRouter.agent.toString(16));
+					chain[circuitLength] = lastRouter.agent;
+				}
 				circuitLength++;
 				extendFailedCounter = 0;
 				invalidList = [];
@@ -113,6 +123,12 @@ function responseHandler(status, message, establisher) {
 					extendCircuit();
 				} else {
 					// circuit is complete
+					if(isDebug) {
+						console.log("Circuit Established:");
+						for(var i = 0; i < chain.length; i++) {
+							console.log("\tAgent: 0x" + chain[i].toString(16));
+						}
+					}
 					sendQueue();
 				}
 			} else if(relayType === relayTypes.extend_failed) {
@@ -123,17 +139,27 @@ function responseHandler(status, message, establisher) {
 					invalidList = [];
 					createFirstHop(true);
 				}
+				if(isDebug) {
+					console.log("Extend failed, trying again.");
+				}
 				invalidList.push(lastRouter);
 				extendCircuit();
 			}
 		} else if(type === types.created) {
 			// success for first hop
+			if(isDebug) {
+				//console.log("Connected to: 0x" + lastRouter.agent.toString(16));
+				chain[0] = lastRouter.agent;
+			}
 			circuitEntry = establisher;
 			circuitLength = 1;
 			invalidList = [];
 			extendCircuit();
 		} else if(type === types.create_failed) {
 			// failure for first hop
+			if(isDebug) {
+				console.log("Create failed, trying again.");
+			}
 			invalidList.push(lastRouter);
 			createFirstHop();
 		}

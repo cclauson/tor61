@@ -247,7 +247,7 @@ def sendMessage(packet, typeName, responseHandler):
 	responseHandler(respPacket, packet)
 
 def unknownCommand(*arg):
-	printFlush(">>Unknown Command, please try again")
+	printFlush("<<Unknown Command, please try again")
 
 
 ##################################
@@ -259,10 +259,10 @@ def unknownCommand(*arg):
 def listenLoop():
 	recvSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	recvSock.bind(('', sendSock.getsockname()[1] + 1))
-	printFlush(">>SETTING UP LISTEN LOOP ON PORT " + str(sendSock.getsockname()[1] + 1))
+	printFlush("<<SETTING UP LISTEN LOOP ON PORT " + str(sendSock.getsockname()[1] + 1))
 	while True:
 		data, addr = recvSock.recvfrom(1024)
-		printFlush(">>RECEIVED PACKET FROM LISTEN LOOP")
+		printFlush("<<RECEIVED PACKET FROM LISTEN LOOP")
 		packet = Packet()
 		packet.pushIntArr(map(ord, data))
 		magic = packet.getVal(0, 2)
@@ -270,7 +270,7 @@ def listenLoop():
 		cmd = packet.getVal(3, 4)
 
 		if (magic == MAGIC_NUM) & (cmd == CMD_PROBE):
-			printFlush(">>I've been probed! Sending ACK response.")
+			printFlush(">>Registration service probed.")
 
 			response = Packet()
 			response.pushVal(MAGIC_NUM, 2)
@@ -296,10 +296,10 @@ def reRegisterLoop():
 
 				def responseHandler(response, sent):
 					if response.getVal(3) != CMD_REGISTERED:
-						printFlush(">>Invalid type on re-register, expected Registered")
+						printFlush("<<Invalid type on re-register, expected Registered")
 					else:
 						sessions[port] = (sent, time.time() + response.getVal(4, 6) - 1)
-						printFlush(">>Re-register " + machineIP + ":" + port + " successful: lifetime = " + str(response.getVal(4, 6)))
+						printFlush(">>Re-register on registration service successful")
 
 				packetInfo[0].refreshHeader()
 				sendMessage(packetInfo[0], "REGISTER", responseHandler)
@@ -338,4 +338,4 @@ while True:
 		break
 	# Incorrect number of arguments
 	except (TypeError):
-		printFlush(">>Incorrect number of arguments for " + args[0])
+		printFlush("<<Incorrect number of arguments for " + args[0])

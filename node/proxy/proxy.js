@@ -2,6 +2,8 @@ var glob = require("../helpers/Constants").glob;
 var net = require('net');
 var HTTPStream = require('../CircuitCreator').HTTPStream;
 
+var isDebug = (glob.LOGGING === '-a' || glob.LOGGING === '-h');
+
 // --------------------------------------
 // 	Set up server to listen for connections
 // --------------------------------------
@@ -69,7 +71,9 @@ var RequestHandler = function(socket) {
 		var method = getMethod(header);
 		var serverInfo = getHostname(header);
 		
-		console.log(">>> " + header.split("\r\n")[0]);
+		if(isDebug) {
+			console.log(">>> " + header.split("\r\n")[0]);
+		}
 
 		if(method === 'CONNECT') {
 			handleConnectTunnel(serverInfo);

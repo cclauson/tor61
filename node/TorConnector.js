@@ -7,6 +7,9 @@ var TorRelayer = require('./TorRelayer').TorRelayer;
 var TorEstablisher = require('./TorEstablisher').TorEstablisher;
 
 var MY_AGENT = require('./helpers/Constants').glob.MY_AGENT;
+var LOGGING = require('./helpers/Constants').glob.LOGGING
+
+var isDebug = (LOGGING === '-a' || LOGGING === '-t');
 
 function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 
@@ -60,7 +63,9 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
 			var cleanup = function() {
-				console.log("Socket " + torSocket.getID() + " closed or errored, cleaning up connections");
+				if(isDebug) {
+					console.log("Socket " + torSocket.getID() + " closed or errored, cleaning up connections");
+				}
 				router.removeConnection(otherAgent);
 				relayer.cleanup();
 				establisher.cleanup();

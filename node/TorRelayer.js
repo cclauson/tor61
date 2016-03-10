@@ -46,11 +46,15 @@ function TorRelayer(torSocket) {
 		var establisher = incomingRoutingTable[circuitID];
 		// If we have a circuit for this ID
 		if(establisher) {
-			console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
-			// Delete it from our records
-			delete incomingRoutingTable[circuitID];
-			// Pass it along
-			establisher.sendMessage(torSocket.getID(), message);
+			if(circuitID !== undefined) {
+				//console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
+				// Delete it from our records
+				delete incomingRoutingTable[circuitID];
+				// Pass it along
+				if(establisher.sendMessage) {
+					establisher.sendMessage(torSocket.getID(), message);
+				}
+			}
 		}
 	}
 
@@ -191,8 +195,8 @@ function TorRelayer(torSocket) {
 		}
 
 		torSocket.write(toSend, function() {
-			if(type === types.destroy) {
-				console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
+			if(type === types.destroy && circuitID !== undefined) {
+				//console.log("Destroying circuit " + circuitID + " on socket " + torSocket.getID());
 				delete incomingRoutingTable[circuitID];
 			}
 		});

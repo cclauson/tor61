@@ -13,13 +13,19 @@ var streams = {};
 
 function beginStream(socketID, circuitID, streamID, ip, port, respond) {
 	var key = generateKey(socketID, circuitID, streamID);
+
+	if(isNaN(port) || port < 0 || port > 65535) {
+		respond('failed');
+		return;
+	}
+
 	var socket = net.createConnection({host : ip, port : port}, function() {
 		
-		socket.removeListener('close', beginFailure);
-		socket.removeListener('error', beginFailure);
-
 		socket.on('error', endFailure);
 		socket.on('close', endFailure);
+
+		socket.removeListener('close', beginFailure);
+		socket.removeListener('error', beginFailure);
 
 		socket.on('data', forwardData);
 
@@ -32,17 +38,17 @@ function beginStream(socketID, circuitID, streamID, ip, port, respond) {
 	//console.log("BEGINNING STREAM");
 
 	var beginFailure = function() {
-		socket.removeListener('close', endFailure);
-		socket.removeListener('error', endFailure);
 		socket.end();
+		// socket.removeListener('close', endFailure);
+		// socket.removeListener('error', endFailure);
 		respond('failed');
 		delete streams[key];
 	};
 
 	var endFailure = function() {
-		socket.removeListener('close', endFailure);
-		socket.removeListener('error', endFailure);
 		socket.end();
+		// socket.removeListener('close', endFailure);
+		// socket.removeListener('error', endFailure);
 		respond('end');
 		delete streams[key];
 	};
@@ -81,8 +87,15 @@ function generateKey(socketID, circuitID, streamID) {
 	return (socketID << 32) + (circuitID << 16) + streamID;
 }
 
+function close() {
+	for(var key in streams) {
+		socket.end();
+	}
+}
+
 module.exports = {
 	beginStream : beginStream,
 	endStream : endStream,
-	receiveData : receiveData
+	receiveData : receiveData,
+	close : close
 };

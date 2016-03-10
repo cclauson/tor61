@@ -31,6 +31,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 		if(checkOps.validateOpen(message, otherAgent, MY_AGENT) && !router.isExistingConnection(otherAgent)) {
 			var openedCell = makeOps.constructOpened(otherAgent, MY_AGENT);
 			torSocket.write(openedCell);
+			console.log("Agent: 0x" + otherAgent.toString(16) + " connected to us.");
 			openFinishedCallback('success');
 		} else {
 			var openFailedCell = makeOps.constructOpenFailed(otherAgent, MY_AGENT);
@@ -59,7 +60,6 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	function openFinishedCallback(status) {
 		clearTimeout(abortTimeout);
 		if(status === 'success') {
-			torSocket.removeListener('error', abortConnection);
 			relayer = new TorRelayer(torSocket);
 			establisher = new TorEstablisher(torSocket, isOpener);
 			var cleanup = function() {
@@ -73,6 +73,7 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 			};
 			torSocket.on('close', cleanup);
 			torSocket.on('error', cleanup);
+			torSocket.removeListener('error', abortConnection);
 			openHandshakeCallback('success', establisher, otherAgent);
 			torSocket.on('data', normalMessageHandler);
 		} else {
@@ -97,9 +98,11 @@ function TorConnector(torSocket, otherAgent, openHandshakeCallback) {
 	}
 
 	function abortConnection() {
-		console.log("Did not receive an open / opened in time, closing socket " + torSocket.getID());
+		if(isDebug) {
+			console.log("Did not receive an open / opened in time, closing socket " + torSocket.getID());
+		}
 		torSocket.close();
-		if(!isOpener) {
+		if(isOpener) {
 			openHandshakeCallback('false');
 		}
 	}

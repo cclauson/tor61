@@ -5,6 +5,7 @@ var TOR_PORT = glob.TOR_PORT;
 var MY_AGENT = glob.MY_AGENT;
 var MY_GROUP = glob.MY_GROUP;
 var MY_INSTANCE = glob.MY_INSTANCE;
+var IS_ONLY_MINE = glob.IS_ONLY_MINE;
 
 // array of available tor routers
 var availableRouters = [];
@@ -37,8 +38,10 @@ function getRandomRouter(invalidList) {
 	// service or our connection to the registration service - this behavior is better
 	// than crashing or erroring.
 	if(usefulRouters.length === 0) {
+		console.log("No routers available, returning self");
 		return {
 			connectInfo : {
+				host : glob.TOR_IP,
 				ip : glob.TOR_IP,
 				port : TOR_PORT
 			},
@@ -101,23 +104,31 @@ var instance = padZero(MY_INSTANCE, 4);
 
 var failCounter = 0;
 
+var routerString = IS_ONLY_MINE ? ("Tor61Router-" + group) : "Tor61Router-";
+
 function initialFetch() {
 	registration.register(TOR_PORT, MY_AGENT, "Tor61Router-" + group + "-" + instance, function(status) {
 		if(status) {
 			// Update our list of available routers every 5 minutes
 			var setRouters = function(data) {
 				if(data) {
-					availableRouters = data;
-					printRouters(data);
-					console.log();
+					var newData = [];
+					for(var i = 0; i < data.length; i++) {
+						if(data[i].agent !== MY_AGENT) {
+							newData.push(data[i]);
+						}
+					}
+					availableRouters = newData;
 				} else {
 					console.log("Unable to reach registration service");
 				}
 				setTimeout(function() {
-					registration.fetch("Tor61Router-" + group, setRouters);
+					registration.fetch(routerString, setRouters);
 				}, 5 * 60 * 1000);
 			}
-			registration.fetch("Tor61Router-" + group, function(data) {
+			registration.fetch(routerString, function(data) {
+				printRouters(data);
+				console.log();
 				setRouters(data);
 				initialFetchCompleted = true;
 				initialSetupCallback();
@@ -134,10 +145,6 @@ function initialFetch() {
 }
 
 initialFetch();
-
-process.on('exit', function() {
-	registration.unregister(TOR_PORT);
-});
 
 module.exports = {
 	getRandomRouter : getRandomRouter,

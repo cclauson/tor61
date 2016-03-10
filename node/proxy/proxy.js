@@ -4,9 +4,21 @@ var HTTPStream = require('../CircuitCreator').HTTPStream;
 
 var isDebug = (glob.LOGGING === '-a' || glob.LOGGING === '-h');
 
+function printDebug(message) {
+	if(isDebug) {
+		if(message) {
+			console.log(message);
+		} else {
+			console.log();
+		}
+	}
+}
+
 // --------------------------------------
 // 	Set up server to listen for connections
 // --------------------------------------
+
+var sessions = {};
 
 var serverPort = glob.SERVER_PORT;
 
@@ -21,7 +33,7 @@ server.on('error', function(err) {
 server.listen(serverPort, function(err) {
 	if(err) throw err;
 	address = server.address();
-	console.log("Proxy listening on " + address.address + ":" + address.port);
+	console.log("Proxy listening on port " + address.port);
 });
 
 // --------------------------------------
@@ -32,16 +44,22 @@ var nextStreamID = 0;
 
 var RequestHandler = function(socket) {
 
+	// Store session so it can be cleanly destroyed on close
+	sessions[streamID] = socket;
+
 	var streamID = nextStreamID;
 	nextStreamID = (nextStreamID + 1) % glob.MAX_ID;
 
+	// The "serverSocket" in this case is actually just an interface into the
+	// Tor section of the router that resembles a net socket interface
+	// This allowed me to reuse most of the proxy code with very little modification.
 	var serverSocket;
 
 	// Temporary storage for buffering the data
 	var prevData;
 
 	socket.on('error', function() {
-		socket.end();
+		endConnection();
 	});
 
 	socket.on('data', handleInitialMessage);
@@ -71,9 +89,7 @@ var RequestHandler = function(socket) {
 		var method = getMethod(header);
 		var serverInfo = getHostname(header);
 		
-		if(isDebug) {
-			console.log(">>> " + header.split("\r\n")[0]);
-		}
+		printDebug(">>> " + header.split("\r\n")[0]);
 
 		if(method === 'CONNECT') {
 			handleConnectTunnel(serverInfo);
@@ -84,6 +100,8 @@ var RequestHandler = function(socket) {
 
 	// Handles setting up a tunnel to the given server
 	function handleConnectTunnel(serverInfo) {
+		// The only major difference from the proxy project is that we create an HTTPStream instead
+		// of a direct socket to the web server
 		serverSocket = new HTTPStream(streamID, serverInfo.host, serverInfo.port, function() {
 
 			socket.on('close', endConnection);
@@ -175,7 +193,9 @@ var RequestHandler = function(socket) {
 
 		// If we can't connect to the server, print an error message and close the request.
 		serverSocket.on('close', function() {
-			//console.log("Connection closed from " + serverInfo.host + " on port " + serverInfo.port);
+			// There's no really nice way to tell why we got a begin_failed message back on
+			// Tor, so we don't have enough information to print a descriptive error. Thus,
+			// we just kill the connection.
 			endConnection();
 		});
 	}
@@ -267,7 +287,22 @@ var RequestHandler = function(socket) {
 	// Unpipe our connections if they are piped, and end both.
 	function endConnection() {
 		socket.end();
-		serverSocket.end();
+		if(serverSocket) {
+			serverSocket.end();
+		}
+		delete sessions[streamID];
 	}
 
+};
+
+// Destroy all sessions and close the server
+function close() {
+	for(var key in sessions) {
+		sessions[key].end();
+	}
+	server.close();
+}
+
+module.exports = {
+	close : close
 };

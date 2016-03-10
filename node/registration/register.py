@@ -335,6 +335,10 @@ while True:
 		dispatcher.get(args[0], unknownCommand)(*(args[1:]))
 	# Ctrl+C or Ctrl+D
 	except (EOFError, KeyboardInterrupt):
+		printFlush("<<Cleaning up browser connections");
+		ports = sessions.keys()
+		for port in ports:
+			unregister(port)
 		break
 	# Incorrect number of arguments
 	except (TypeError):

@@ -71,28 +71,27 @@ function TorEstablisher(torSocket, isOpener) {
 
 		var postWriteCallback;
 
+		var messageType = readOps.getType(message);
+		var relayType = readOps.getRelayCommand(message);
+		var streamID = readOps.getStreamID(message);
+
 		// This will only happen if there is an error in the TorRelayer code - issues in
 		// other routers cannot directly cause this.
 		if(isNaN(newCircuitID)) {
-			throw new Error("Did not register handler before sending message or circuit in message is malformed");
+			return;
 		}
 
 		// Update the circuit id
 		makeOps.modifyCircuitID(message, newCircuitID);
 
-		var messageType = readOps.getType(message);
-		var relayType = readOps.getRelayCommand(message);
-
 		// If we expect a response from this message
 		// relay that isn't end or data
 		// type that isn't relay or destroy
-		if(messageType !== types.destroy && messageType !== types.relay) {
-
+		if(messageType !== types.destroy && (messageType !== types.relay || relayType === relayTypes.extend)) {
 			// If we're already waiting for a response on this circuit, print an error and return without sending
 			// This will only occur if some code in 
 			if(timeoutTable[newCircuitID]) {
-				console.log("ALREADY WAITING FOR RESPONSE ON CIRCUIT " + newCircuitID);
-				var streamID = readOps.getStreamID(message);
+				//console.log("ALREADY WAITING FOR RESPONSE ON CIRCUIT " + newCircuitID);
 				var response = makeOps.constructMatchingFailure(messageType, newCircuitID, relayType, streamID);
 				incomingRoutingTable[newCircuitID]('failure', response);
 			}
@@ -106,8 +105,10 @@ function TorEstablisher(torSocket, isOpener) {
 					// var streamID = readOps.getStreamID(message);
 					// var response = makeOps.constructMatchingFailure(type, newCircuitID, relayType, streamID);
 					// incomingRoutingTable[newCircuitID]('failure', response);
-					var deleteMessage = makeOps.constructDestroy(newCircuitID);
-					incomingRoutingTable[newCircuitID]('ended', deleteMessage);
+					if(typeof(incomingRoutingTable[newCircuitID]) === 'function') {
+						var deleteMessage = makeOps.constructDestroy(newCircuitID);
+						incomingRoutingTable[newCircuitID]('ended', deleteMessage);
+					}
 				}, 5000);
 			};
 		}
@@ -121,7 +122,8 @@ function TorEstablisher(torSocket, isOpener) {
 		}
 
 		// Send the message
-		torSocket.write(message, postWriteCallback);
+		torSocket.write(message);//, postWriteCallback);
+		if(postWriteCallback) postWriteCallback();
 		
 	};
 
@@ -141,12 +143,13 @@ function TorEstablisher(torSocket, isOpener) {
 	function deleteCircuit(oldCircuitID, messagingSocketID) {
 		var oldKey = generateKey(oldCircuitID, messagingSocketID)
 		var newID = outgoingRoutingTable[oldKey];
-		console.log("Destroying circuit " + newID + " on socket " + torSocket.getID());
-		delete outgoingRoutingTable[oldKey];
-		delete incomingRoutingTable[newID];
-
-		clearTimeout(timeoutTable[newID]);
-		delete timeoutTable[newID];
+		if(newID !== undefined) {
+			//console.log("Destroying circuit " + newID + " on socket " + torSocket.getID());
+			delete outgoingRoutingTable[oldKey];
+			delete incomingRoutingTable[newID];
+			clearTimeout(timeoutTable[newID]);
+			delete timeoutTable[newID];
+		}
 	}
 
 }

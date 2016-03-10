@@ -150,6 +150,14 @@ function TorSocket(socket, id) {
 		return step * Math.ceil(val / step);
 	}
 
+	socket.on('error', function() {
+		console.log("ERROR IN SOCKET");
+	});
+
+	socket.on('timeout', function() {
+		console.log("ERROR IN SOCKET");
+	});
+
 	// Set our listener for the raw socket
 	socket.on('data', processTCPData);
 

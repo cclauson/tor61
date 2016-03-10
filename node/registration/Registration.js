@@ -1,8 +1,13 @@
 const spawn = require('child_process').spawn;
 const regService = spawn('python', ['./registration/register.py', 'cse461.cs.washington.edu', '46101']);
+var LOGGING = require('../helpers/Constants').glob.LOGGING
 
 var listener = false;
 
+var isDebug = (LOGGING === '-a');
+
+// Set the listener to receive all lines with no < / > marks, to
+// print all those with > marks, and to ignore all those with < marks
 function setListener(newListener) {
 	removeListener();
 	listener = function(data) {
@@ -10,7 +15,9 @@ function setListener(newListener) {
 		var splitData = data.toString().split("\n");
 		for(var i = 0; i < splitData.length; i++) {
 			if(splitData[i][0] === '>') {
-				console.log(splitData[i])
+				if(isDebug) {
+					console.log(splitData[i]);
+				}
 			} else if(splitData[i][0] !== '<') {
 				newListener(splitData[i]);
 			}
@@ -44,6 +51,9 @@ regService.on('close', function() {
 	process.exit();
 });
 
+// Helper for functions that interface with registration service
+// Packs the arguments into a single string separated by spaces and
+// ended with a newline so stdin will accept it.
 function sendMessage() {
 	var sendString = ""
 	for(var i = 0; i < arguments.length - 1; i++) {
@@ -85,6 +95,7 @@ function fetch(prefix, callback) {
 			if(dataSplit[0] === "fetch_entry") {
 				entries.push({
 					connectInfo : {
+						host : dataSplit[1],
 						ip : dataSplit[1],
 						port : parseInt(dataSplit[2])
 					},
